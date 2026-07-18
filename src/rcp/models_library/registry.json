@@ -1,0 +1,19 @@
+{
+  "DataCenterRoom": {
+    "file": "DataCenterRoom.mo",
+    "class_name": "DataCenterRoom",
+    "description": "Lumped thermal model of a data center room: IT heat load, envelope losses, proportional cooling with COP-based electric power. Fast, self-contained (no MSL dependencies).",
+    "default_stop_time": 86400,
+    "outputs": ["T", "Q_cool", "P_cool", "E_cool"],
+    "parameters": {
+      "Q_it": {"default": 50000, "min": 1000, "max": 500000, "unit": "W", "description": "IT heat load"},
+      "C_room": {"default": 2000000, "min": 100000, "max": 100000000, "unit": "J/K", "description": "Room thermal capacitance"},
+      "UA": {"default": 2000, "min": 0, "max": 50000, "unit": "W/K", "description": "Envelope conductance to ambient"},
+      "T_amb": {"default": 30, "min": -20, "max": 55, "unit": "degC", "description": "Ambient temperature"},
+      "T_set": {"default": 24, "min": 15, "max": 35, "unit": "degC", "description": "Cooling setpoint"},
+      "Q_cool_max": {"default": 80000, "min": 1000, "max": 1000000, "unit": "W", "description": "Maximum cooling capacity"},
+      "k_p": {"default": 20000, "min": 100, "max": 1000000, "unit": "W/K", "description": "Proportional controller gain"},
+      "COP": {"default": 3.5, "min": 1.0, "max": 10.0, "unit": "-", "description": "Cooling coefficient of performance"}
+    }
+  }
+}
