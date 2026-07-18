@@ -57,7 +57,7 @@ export function Models() {
   return (
     <section>
       <h1 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 14px" }}>Models &amp; simulations</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr", gap: 16, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16, alignItems: "start" }}>
         <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 10, overflow: "hidden" }}>
           <div style={{ padding: "12px 16px", borderBottom: "1px solid #eceff1" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>

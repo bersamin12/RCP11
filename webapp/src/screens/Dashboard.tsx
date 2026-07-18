@@ -42,7 +42,8 @@ export function Dashboard({ openRun }: { openRun: (id: string) => void }) {
           ))}
         </div>
       </div>
-      <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, overflow: "hidden" }}>
+      <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, overflowX: "auto" }}>
+       <div style={{ minWidth: 760 }}>
         <div
           style={{
             display: "grid", gridTemplateColumns: GRID, padding: "8px 14px", background: "#fafbfc",
@@ -89,6 +90,7 @@ export function Dashboard({ openRun }: { openRun: (id: string) => void }) {
             No runs yet — start one with <b>New Run</b>.
           </div>
         )}
+       </div>
       </div>
     </section>
   );

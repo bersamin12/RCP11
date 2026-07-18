@@ -78,12 +78,12 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
       </button>
 
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 3 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 3 }}>
             <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>{record.topic}</h1>
             <StatusBadge status={status} />
           </div>
-          <div className="mono" style={{ display: "flex", gap: 14, alignItems: "center", fontSize: 11.5, color: "#8a9099" }}>
+          <div className="mono" style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", alignItems: "center", fontSize: 11.5, color: "#8a9099" }}>
             <span>{record.run_id}</span>
             <span>·</span>
             <span>elapsed {fmtElapsed(record)}</span>
@@ -158,7 +158,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#92400e" }}>Hypothesis selection</h3>
           </div>
           <p style={{ margin: "0 0 13px", color: "#a16207", fontSize: 12.5 }}>Which hypothesis should we compile into an experiment?</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 11 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 11 }}>
             {(state.hypotheses ?? []).map((h, i) => (
               <div key={h.id} style={{ background: "#fff", border: "1px solid #f0e0b0", borderRadius: 9, padding: "13px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -193,7 +193,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
           <p style={{ margin: "0 0 12px", color: "#a16207", fontSize: 12.5 }}>
             Approve this experiment specification, or request changes to route back to spec_compile.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
             <div style={{ background: "#fff", border: "1px solid #f0e0b0", borderRadius: 9, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 88px 118px", padding: "7px 12px", background: "#fafbfc", borderBottom: "1px solid #eceff1", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, color: "#9aa1a9", fontWeight: 600 }}>
                 <div>Parameter</div><div style={{ textAlign: "right" }}>Value</div><div style={{ textAlign: "right" }}>Range · unit</div>
@@ -242,7 +242,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
       )}
 
       {/* TABS */}
-      <div style={{ display: "flex", gap: 3, borderBottom: "1px solid #e4e7ea", marginBottom: 16 }}>
+      <div style={{ display: "flex", gap: 3, borderBottom: "1px solid #e4e7ea", marginBottom: 16, overflowX: "auto" }}>
         {tabDefs.map((t) => {
           const on = tab === t.key;
           return (
@@ -271,7 +271,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
       <div style={{ minHeight: 180 }}>
         {tab === "papers" &&
           (state.paper_cards?.length ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 11 }}>
               {state.paper_cards.map((p) => (
                 <div key={p.id} style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "13px 15px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 5 }}>
@@ -300,7 +300,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
 
         {tab === "gaps" &&
           (state.hypotheses?.length ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 16 }}>
               <div>
                 <h3 style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4, color: "#0e7490", margin: "0 0 9px" }}>Research gaps</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -349,7 +349,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
 
         {tab === "exp" &&
           (spec ? (
-            <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
               <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, overflow: "hidden" }}>
                 <div style={{ padding: "10px 14px", borderBottom: "1px solid #eceff1", display: "flex", alignItems: "center", gap: 9 }}>
                   <span className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: "#0f766e" }}>{spec.model_name}</span>
@@ -392,7 +392,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
         {tab === "results" &&
           (state.result_bundle?.status === "ok" ? (
             <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 10, marginBottom: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
                 {Object.entries(state.result_bundle.metrics).map(([key, value]) => {
                   const d = METRIC_DISPLAY[key] ?? { unit: "", label: key, color: "#4b5563" };
                   return (
@@ -407,7 +407,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
                   );
                 })}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
                 <ChartCard title="Room temperature T" color="#dc2626" unit="°C" series={series} column="T" />
                 <ChartCard title="Cooling power P_cool" color="#0f766e" unit="W" series={series} column="P_cool" />
               </div>
@@ -419,7 +419,7 @@ export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: 
         {tab === "report" &&
           (report ? (
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 10, padding: "34px 44px", maxWidth: 720, width: "100%" }}>
+              <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 10, padding: "clamp(16px, 5vw, 34px) clamp(16px, 6vw, 44px)", maxWidth: 720, width: "100%" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <span className="mono" style={{ fontSize: 10.5, color: "#9aa1a9" }}>data/runs/{runId}/report.md</span>
                   <span className="mono" style={{ fontSize: 10.5, color: "#0e7490" }}>markdown</span>

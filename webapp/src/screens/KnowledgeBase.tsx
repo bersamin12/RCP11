@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 
 import { api } from "../api";
 import { PendingMessage } from "../components/Badges";
+import { useNarrow } from "../hooks";
 import type { MemoryDetail, MemoryTopic } from "../types";
 
 export function KnowledgeBase() {
+  const narrow = useNarrow();
   const [topics, setTopics] = useState<MemoryTopic[]>([]);
   const [slug, setSlug] = useState<string | null>(null);
   const [detail, setDetail] = useState<MemoryDetail | null>(null);
@@ -42,8 +44,8 @@ export function KnowledgeBase() {
       {topics.length === 0 ? (
         <PendingMessage>No knowledge snapshots yet — run <span className="mono">research_memory_build</span> via a run or <span className="mono">rcp memory-build</span>.</PendingMessage>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "230px 1fr", gap: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: narrow ? "1fr" : "230px 1fr", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: narrow ? "row" : "column", flexWrap: "wrap", gap: 8 }}>
             {topics.map((t) => {
               const active = t.slug === slug;
               return (
@@ -89,7 +91,7 @@ export function KnowledgeBase() {
                 </span>
               ))}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 11 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 11 }}>
               {filtered.map((p) => (
                 <div key={p.id} style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "13px 15px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 5 }}>

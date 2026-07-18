@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api } from "./api";
+import { useNarrow } from "./hooks";
 import { Dashboard } from "./screens/Dashboard";
 import { KnowledgeBase } from "./screens/KnowledgeBase";
 import { Models } from "./screens/Models";
@@ -22,6 +23,7 @@ function parseHash(): Route {
 export default function App() {
   const [route, setRoute] = useState<Route>(parseHash());
   const [apiUp, setApiUp] = useState<boolean | null>(null);
+  const narrow = useNarrow(760);
 
   useEffect(() => {
     const onHash = () => setRoute(parseHash());
@@ -53,8 +55,9 @@ export default function App() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", fontSize: 13 }}>
       <header
         style={{
-          height: 46, flex: "0 0 46px", display: "flex", alignItems: "center", gap: 20,
-          padding: "0 18px", background: "#ffffff", borderBottom: "1px solid #e4e7ea",
+          height: 46, flex: "0 0 46px", display: "flex", alignItems: "center",
+          gap: narrow ? 8 : 20, padding: narrow ? "0 10px" : "0 18px",
+          background: "#ffffff", borderBottom: "1px solid #e4e7ea",
           position: "sticky", top: 0, zIndex: 40,
         }}
       >
@@ -62,12 +65,14 @@ export default function App() {
           <div className="mono" style={{ width: 22, height: 22, borderRadius: 5, background: ACCENT, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 12 }}>
             R
           </div>
-          <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-            <span className="mono" style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.2 }}>RCP·2026/11</span>
-            <span style={{ fontSize: 9.5, color: "#8a9099", letterSpacing: 0.3, textTransform: "uppercase" }}>Digital Twin Research Loop</span>
-          </div>
+          {!narrow && (
+            <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+              <span className="mono" style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.2 }}>RCP·2026/11</span>
+              <span style={{ fontSize: 9.5, color: "#8a9099", letterSpacing: 0.3, textTransform: "uppercase" }}>Digital Twin Research Loop</span>
+            </div>
+          )}
         </div>
-        <nav style={{ display: "flex", gap: 2, marginLeft: 8 }}>
+        <nav style={{ display: "flex", gap: 2, marginLeft: narrow ? 0 : 8, overflowX: "auto", minWidth: 0 }}>
           {navItems.map((n) => {
             const active = activeKey === n.key;
             return (
@@ -75,10 +80,11 @@ export default function App() {
                 key={n.key}
                 onClick={() => go(n.hash)}
                 style={{
-                  height: 28, padding: "0 12px", border: 0, borderRadius: 6,
+                  height: 28, padding: narrow ? "0 8px" : "0 12px", border: 0, borderRadius: 6,
                   background: active ? "#ecfeff" : "transparent",
                   color: active ? "#0e7490" : "#4b5563",
                   fontWeight: active ? 600 : 500, fontSize: 12.5, cursor: "pointer",
+                  whiteSpace: "nowrap", flex: "0 0 auto",
                 }}
               >
                 {n.label}
@@ -86,7 +92,7 @@ export default function App() {
             );
           })}
         </nav>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: narrow ? 8 : 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b7280" }}>
             <span
               style={{
@@ -95,22 +101,22 @@ export default function App() {
                 boxShadow: `0 0 0 3px ${apiUp === false ? "#dc262622" : "#16a34a22"}`,
               }}
             />
-            <span className="mono">{apiUp === false ? "api down" : "api :8000"}</span>
+            {!narrow && <span className="mono">{apiUp === false ? "api down" : "api :8000"}</span>}
           </div>
           <button
             onClick={() => go("/new")}
             style={{
-              height: 28, padding: "0 13px", borderRadius: 6, border: 0, background: ACCENT,
+              height: 28, padding: narrow ? "0 9px" : "0 13px", borderRadius: 6, border: 0, background: ACCENT,
               color: "#fff", fontWeight: 600, fontSize: 12, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 6,
+              display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", flex: "0 0 auto",
             }}
           >
-            <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> New Run
+            <span style={{ fontSize: 14, lineHeight: 1 }}>+</span> {narrow ? "New" : "New Run"}
           </button>
         </div>
       </header>
 
-      <main style={{ flex: 1, padding: "18px 22px 40px", maxWidth: 1320, width: "100%", margin: "0 auto" }}>
+      <main style={{ flex: 1, padding: narrow ? "14px 12px 40px" : "18px 22px 40px", maxWidth: 1320, width: "100%", margin: "0 auto" }}>
         {route.screen === "dashboard" && <Dashboard openRun={openRun} />}
         {route.screen === "newrun" && <NewRun goDashboard={() => go("/")} openRun={openRun} />}
         {route.screen === "run" && <RunDetail runId={route.id} goDashboard={() => go("/")} />}
