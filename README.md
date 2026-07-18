@@ -8,9 +8,10 @@ See [docs/PRD.md](docs/PRD.md) for full requirements.
 
 ```bash
 cd rcp-platform
-uv venv .venv && uv pip install -e ".[dev]"
+conda create -n rcp python=3.13 && conda activate rcp
+pip install -e ".[dev]"
+# (alternative without conda: uv venv .venv && uv pip install -e ".[dev]" && source .venv/bin/activate)
 cp .env.example .env        # fill in OPENROUTER_API_KEY
-source .venv/bin/activate
 
 rcp verify-llm              # smoke-test the LLM provider
 rcp models                  # list simulation models
@@ -74,8 +75,33 @@ llm.py                          provider-agnostic chat model + validated-JSON he
 Data lands in `data/`: `memory/<topic>/<timestamp>/` snapshots, `runs/<run_id>/`
 (sim workdir + report.md), `checkpoints.sqlite`.
 
+## Web UI
+
+FastAPI backend (`src/rcp/api/`) + React frontend (`webapp/`), implementing the
+Claude Design handoff (see `docs/UI_DESIGN_PROMPT.md` for the spec).
+
+```bash
+# development (two terminals)
+uvicorn rcp.api.main:app --port 8000        # backend, from repo root
+cd webapp && npm install && npm run dev     # frontend on :5173, proxies /api
+
+# production (single server)
+cd webapp && npm run build                  # emits webapp/dist
+uvicorn rcp.api.main:app --port 8000        # serves the UI at http://localhost:8000
+```
+
+Screens: Dashboard (live run list), New Run, Run Detail (9-node stepper with
+live SSE updates, Gate 1 hypothesis cards, Gate 2 spec approval with a
+reject-and-revise loop, tabs for Papers / Gaps & Hypotheses / Experiment /
+Results / Report / Claims), Knowledge Base browser, and Models with a
+quick-simulate panel driven by the model registry.
+
+Key endpoints: `POST /api/runs`, `GET /api/runs/{id}` (+ `/events` SSE,
+`/report`, `/series`), `POST /api/runs/{id}/gate`, `GET /api/memory[/{slug}]`,
+`GET /api/models`, `POST /api/simulations`.
+
 ## Tests
 
 ```bash
-pytest        # offline unit tests (dedup, registry, collector)
+pytest        # offline: dedup/registry/collector units + API tests (LLM & sim mocked)
 ```
