@@ -1,8 +1,10 @@
 """Simulation runner: executes ExperimentSpecs via OpenModelica (PRD M4.2 MVP).
 
-MVP uses omc scripting (.mos) through either a local omc install or the official
-Docker image. The OMPython/OMCSessionZMQ interactive backend is a planned upgrade
-once OpenModelica is available natively (tracked for Phase 2 hardening).
+Three backends: omc scripting (.mos) through the pinned Docker image (default for
+library models, which need the baked-in OPENMODELICALIBRARY), the same script
+through a local omc install, and an OMPython/OMCSessionZMQ interactive session.
+OMPython is opt-in via RCP_OM_BACKEND=ompython -- "auto" never selects it, so the
+reproducible Docker path stays the default for anything the benchmark depends on.
 """
 
 import os
@@ -13,7 +15,7 @@ from pathlib import Path
 
 from rcp.config import get_settings
 from rcp.objects import ExperimentSpec
-from rcp.simulation.registry import get_model, validate_spec
+from rcp.simulation.registry import ModelInfo, get_model, library_paths, validate_spec
 
 
 class SimulationError(Exception):
@@ -34,14 +36,33 @@ def _diagnose(log: str) -> str:
     return "simulation failed — see log excerpt"
 
 
+def _library_load_cmds(model: ModelInfo) -> list[str]:
+    """Version-pinned loadModel calls for the libraries a model depends on.
+
+    The version is part of the command, not a hint: an unpinned loadModel would
+    silently accept whatever the environment happens to hold.
+    """
+    return [
+        f'loadModel({name}, {{"{version}"}}); getErrorString();'
+        for name, version in model.libraries.items()
+    ]
+
+
+def _simulate_cmd(model: ModelInfo, spec: ExperimentSpec) -> str:
+    overrides = ",".join(f"{k}={v}" for k, v in spec.parameters.items())
+    simflags = f', simflags="-override {overrides}"' if overrides else ""
+    return (
+        f"simulate({model.class_name}, stopTime={spec.stop_time}, "
+        f'numberOfIntervals={spec.intervals}, outputFormat="csv", '
+        f'fileNamePrefix="result"{simflags})'
+    )
+
+
 def _write_mos(spec: ExperimentSpec, workdir: Path) -> Path:
     model = get_model(spec.model_name)
     overrides = ",".join(f"{k}={v}" for k, v in spec.parameters.items())
     simflags = f', simflags="-override {overrides}"' if overrides else ""
-    library_loads = "".join(
-        f'loadModel({name}, {{"{version}"}}); getErrorString();\n'
-        for name, version in model.libraries.items()
-    )
+    library_loads = "".join(cmd + "\n" for cmd in _library_load_cmds(model))
     mos = (
         library_loads
         + f'loadFile("{model.file}"); getErrorString();\n'
@@ -52,6 +73,18 @@ def _write_mos(spec: ExperimentSpec, workdir: Path) -> Path:
     path = workdir / "run.mos"
     path.write_text(mos)
     return path
+
+
+def _local_env() -> dict[str, str]:
+    """OPENMODELICALIBRARY for the backends that run outside the pinned image.
+
+    Docker needs none of this: its libraries are baked into /opt/modelica.
+    """
+    env = dict(os.environ)
+    paths = library_paths()
+    if paths:
+        env["OPENMODELICALIBRARY"] = os.pathsep.join(paths)
+    return env
 
 
 def _pick_backend(model_name: str = "") -> str:
@@ -77,8 +110,12 @@ def run_simulation(spec: ExperimentSpec, workdir: Path) -> tuple[Path, str]:
     _write_mos(spec, workdir)
 
     backend = _pick_backend(spec.model_name)
+    if backend == "ompython":
+        return _run_ompython(spec, model, workdir)
+    env = None
     if backend == "local":
         cmd = ["omc", "run.mos"]
+        env = _local_env()
     else:
         cmd = [
             "docker", "run", "--rm",
@@ -90,7 +127,9 @@ def run_simulation(spec: ExperimentSpec, workdir: Path) -> tuple[Path, str]:
             "omc", "run.mos",
         ]
     try:
-        proc = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True, timeout=1200)
+        proc = subprocess.run(
+            cmd, cwd=workdir, capture_output=True, text=True, timeout=1200, env=env
+        )
     except FileNotFoundError as err:
         raise SimulationError(f"simulation backend is unavailable: {err}") from err
     except subprocess.TimeoutExpired as err:
@@ -154,5 +193,41 @@ def run_compiled_simulation(
     log = proc.stdout + proc.stderr
     result_csv = workdir / "result_res.csv"
     if proc.returncode != 0 or "The simulation finished successfully" not in log or not result_csv.exists():
+        raise SimulationError(f"{_diagnose(log)}\n--- log tail ---\n{log[-2000:]}")
+    return result_csv, log
+
+
+def _run_ompython(spec: ExperimentSpec, model: ModelInfo, workdir: Path) -> tuple[Path, str]:
+    """Interactive OMCSessionZMQ backend, for hosts with OpenModelica installed natively.
+
+    Opt-in only (RCP_OM_BACKEND=ompython). It resolves libraries from the host's
+    OPENMODELICALIBRARY rather than the pinned image, so a run made this way is not
+    interchangeable with a Docker run for reproducibility purposes.
+    """
+    try:
+        from OMPython import OMCSessionZMQ
+    except ImportError as err:  # pragma: no cover - depends on environment
+        raise SimulationError(
+            "OMPython is not installed — `pip install OMPython`, or use RCP_OM_BACKEND=docker"
+        ) from err
+
+    os.environ.update(_local_env())
+    model_file = str((workdir / model.file).resolve()) if model.file else None
+
+    omc = OMCSessionZMQ()
+    try:
+        omc.sendExpression(f'cd("{workdir.resolve()}")')
+        for cmd in _library_load_cmds(model):
+            omc.sendExpression(cmd)
+        if model_file:
+            omc.sendExpression(f'loadFile("{model_file}"); getErrorString();')
+        log = str(omc.sendExpression(_simulate_cmd(model, spec)))
+    except Exception as err:  # OMCSessionException and friends
+        log = str(err)
+    finally:
+        del omc  # OMCSessionZMQ.__del__ terminates the omc process
+
+    result_csv = workdir / "result_res.csv"
+    if "The simulation finished successfully" not in log or not result_csv.exists():
         raise SimulationError(f"{_diagnose(log)}\n--- log tail ---\n{log[-2000:]}")
     return result_csv, log

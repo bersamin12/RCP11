@@ -53,10 +53,11 @@ class RCPState(BaseModel):
     spec_approved: bool = False
     spec_feedback: str = ""
     spec_attempts: int = 0
+    rollback_action: str = ""
     result_bundle: ResultBundle | None = None
     experiment_results: ExperimentResultSet | None = None
     claim_bundle: ClaimBundle | None = None
     review_bundle: ReviewBundle | None = None
     review_attempts: int = 0
-    rollback_action: str = ""
+    consistency_warnings: list[str] = Field(default_factory=list)
     report_path: str = ""

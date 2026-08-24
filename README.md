@@ -143,6 +143,12 @@ Buildings 13.0.0 while building. `OPENMODELICALIBRARY` points only at the bundle
 libraries. The self-contained `DataCenterRoom` model may also run under a local
 `omc` installation.
 
+`RCP_OM_BACKEND=ompython` runs the same commands through an interactive
+`OMCSessionZMQ` on a host with OpenModelica installed natively. It is opt-in:
+`auto` never selects it, because it resolves libraries from the host
+(`RCP_LIBRARY_PATH`, default `vendor/`) rather than from the pinned image, so a
+run made that way is not interchangeable with a Docker run for reproducibility.
+
 `DataCenterRoom` is deliberately classified as **conceptual**, even though its
 offline energy-balance, analytic-equilibrium, saturation, low-load,
 repeatability, unit, and sensitivity checks pass. It has not been calibrated to

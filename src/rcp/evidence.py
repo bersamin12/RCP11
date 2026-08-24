@@ -1,13 +1,50 @@
-"""Deterministic claim/evidence consistency checks."""
+"""Evidence & provenance: hashing, sealed specs, claim consistency (PRD X.3, M6.3).
+
+``spec_digest`` seals an experiment spec: a curated, order-independent subset, so
+the digest tracks what the run actually executes rather than every incidental
+field. ``review_claims`` is the deterministic gate that decides whether a claim
+bundle is valid; nothing else in the pipeline may fail a study.
+"""
+
+import hashlib
+import json
+from pathlib import Path
 
 from rcp.objects import (
     ClaimBundle,
     ExperimentPlan,
     ExperimentResultSet,
+    ExperimentSpec,
     PaperCard,
     ReviewBundle,
     ReviewIssue,
 )
+
+
+def sha256_text(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def spec_digest(spec: ExperimentSpec) -> str:
+    """Deterministic, order-independent hash of an ExperimentSpec (the sealed spec)."""
+    payload = {
+        "id": spec.id,
+        "hypothesis_id": spec.hypothesis_id,
+        "model_name": spec.model_name,
+        "parameters": dict(sorted(spec.parameters.items())),
+        "outputs": sorted(spec.outputs),
+        "stop_time": spec.stop_time,
+        "intervals": spec.intervals,
+    }
+    return sha256_text(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
 
 def review_claims(

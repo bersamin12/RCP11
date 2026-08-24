@@ -34,3 +34,37 @@ def test_unknown_model_and_param_and_range():
 def test_unknown_model_raises():
     with pytest.raises(KeyError):
         get_model("DoesNotExist")
+
+
+def test_buildings_models_registered_with_pinned_libraries():
+    for name in ("ChillerCooledIntegrated", "ChillerCooledNonIntegrated"):
+        m = get_model(name)
+        # Versions are pinned in the registry, not merely named: an unpinned
+        # library would let the environment decide what the benchmark ran against.
+        assert m.libraries == {"Modelica": "4.1.0", "Buildings": "13.0.0"}
+        assert m.file == "BuildingsBenchmarks.mo"
+        assert m.class_name.startswith("RCPBenchmarks.")
+        assert m.source == "library-wrapper"
+        assert m.validation_status == "library-validated"
+
+
+def test_buildings_model_parameters_bounded():
+    m = get_model("ChillerCooledNonIntegrated")
+    assert "T_chw_set" in m.parameters
+    assert "Q_room" in m.parameters
+    chw = m.parameters["T_chw_set"]
+    assert chw.min < chw.default < chw.max
+
+
+def test_buildings_models_declare_limitations_and_operating_range():
+    m = get_model("ChillerCooledIntegrated")
+    assert m.limitations
+    assert set(m.operating_range) >= {"Q_room", "T_chw_set"}
+
+
+def test_library_paths_defaults_to_vendor():
+    from rcp.simulation.registry import library_paths
+
+    paths = library_paths()
+    assert any(p.endswith("vendor/Modelica") for p in paths)
+    assert any(p.endswith("vendor/Buildings") for p in paths)

@@ -1,6 +1,7 @@
 """Model registry: available Modelica models, parameters, I/O (PRD M4.1, M3.2 support)."""
 
 import json
+import os
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -8,6 +9,8 @@ from pydantic import BaseModel, Field
 from rcp.objects import ExperimentSpec
 
 MODELS_DIR = Path(__file__).parent.parent / "models_library"
+REPO_ROOT = MODELS_DIR.parent.parent.parent  # models_library -> rcp -> src -> repo root
+VENDOR_DIR = REPO_ROOT / "vendor"
 
 
 class ParamSpec(BaseModel):
@@ -50,6 +53,21 @@ def get_model(name: str) -> ModelInfo:
     if name not in registry:
         raise KeyError(f"unknown model '{name}' — available: {list(registry)}")
     return registry[name]
+
+
+def library_paths() -> list[str]:
+    """Directories each holding a Modelica package directory (e.g. vendor/Modelica
+    holds Modelica/ and ModelicaServices/).
+
+    Only the local and ompython backends need this. The pinned Docker image bakes
+    its libraries into OPENMODELICALIBRARY, so it ignores the setting entirely.
+    """
+    from rcp.config import get_settings
+
+    raw = get_settings().rcp_library_path
+    if raw:
+        return [p for p in raw.split(os.pathsep) if p]
+    return [str(VENDOR_DIR / "Modelica"), str(VENDOR_DIR / "Buildings")]
 
 
 def validate_spec(spec: ExperimentSpec) -> list[str]:
