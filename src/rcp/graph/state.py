@@ -25,6 +25,8 @@ class RCPState(BaseModel):
     spec_approved: bool = False
     spec_feedback: str = ""
     spec_attempts: int = 0
+    rollback_action: str = ""
     result_bundle: ResultBundle | None = None
     claim_bundle: ClaimBundle | None = None
+    consistency_warnings: list[str] = Field(default_factory=list)
     report_path: str = ""

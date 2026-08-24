@@ -4,6 +4,7 @@ import csv
 import math
 from pathlib import Path
 
+from rcp.evidence import sha256_file, spec_digest
 from rcp.objects import ExperimentSpec, ResultBundle
 
 
@@ -48,7 +49,8 @@ def build_result_bundle(
 ) -> ResultBundle:
     if result_csv is None:
         return ResultBundle(
-            spec_id=spec.id, status="failed", workdir=str(workdir), log_excerpt=error[-2000:]
+            spec_id=spec.id, status="failed", workdir=str(workdir),
+            log_excerpt=error[-2000:], spec_hash=spec_digest(spec),
         )
     series = load_series(result_csv)
     return ResultBundle(
@@ -58,4 +60,27 @@ def build_result_bundle(
         result_file=str(result_csv),
         metrics=compute_metrics(series),
         log_excerpt=log[-1000:],
+        spec_hash=spec_digest(spec),
+        result_file_hash=sha256_file(result_csv),
     )
+
+
+def compare_bundles(baseline: ResultBundle, candidate: ResultBundle) -> dict[str, dict]:
+    """Comparator (PRD M5.2): side-by-side metric deltas, baseline -> candidate."""
+    keys = sorted(set(baseline.metrics) | set(candidate.metrics))
+    rows: dict[str, dict] = {}
+    for k in keys:
+        b = baseline.metrics.get(k)
+        c = candidate.metrics.get(k)
+        if b is None or c is None:
+            rows[k] = {"baseline": b, "candidate": c, "delta": None, "delta_pct": None}
+            continue
+        delta = c - b
+        pct = (delta / b * 100) if b else None
+        rows[k] = {
+            "baseline": b,
+            "candidate": c,
+            "delta": round(delta, 4),
+            "delta_pct": round(pct, 2) if pct is not None else None,
+        }
+    return rows

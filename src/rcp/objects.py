@@ -54,15 +54,21 @@ class ResultBundle(BaseModel):
     result_file: str | None = None
     metrics: dict[str, float] = Field(default_factory=dict)
     log_excerpt: str = ""
+    spec_hash: str = ""  # sealed spec digest (PRD X.3)
+    result_file_hash: str = ""  # SHA-256 of the raw result file (PRD X.3)
 
 
 class Claim(BaseModel):
     statement: str
-    evidence: str = ""  # which metrics/results support it
+    evidence: str = ""  # which metrics/results support it (human-readable)
+    metric_keys: list[str] = Field(default_factory=list)  # cited metric names (PRD X.3)
+    paper_ids: list[str] = Field(default_factory=list)  # cited source papers (PRD X.3)
     confidence: str = "medium"  # low | medium | high
 
 
 class ClaimBundle(BaseModel):
     hypothesis_id: str
+    spec_id: str = ""  # spec the claims trace to (PRD X.3)
+    result_hash: str = ""  # result-file fingerprint the claims trace to (PRD X.3)
     claims: list[Claim] = Field(default_factory=list)
     summary: str = ""

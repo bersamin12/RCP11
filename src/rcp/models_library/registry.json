@@ -15,5 +15,40 @@
       "k_p": {"default": 20000, "min": 100, "max": 1000000, "unit": "W/K", "description": "Proportional controller gain"},
       "COP": {"default": 3.5, "min": 1.0, "max": 10.0, "unit": "-", "description": "Cooling coefficient of performance"}
     }
+  },
+  "NonIntegratedPlant": {
+    "file": "",
+    "class_name": "Buildings.Applications.DataCenters.ChillerCooled.Examples.NonIntegratedPrimarySecondaryEconomizer",
+    "description": "Primary-secondary chiller plant with non-integrated waterside economizer (Buildings 13.0.0). Baseline in the milestone benchmark.",
+    "libraries": ["Modelica", "Buildings"],
+    "default_stop_time": 86400,
+    "outputs": ["roo.TRooAir", "PHVAC.y", "PIT.y", "EHVAC.y", "EIT.y", "FCTim.y", "PMCTim.y", "FMCHou.y", "swiTim.y"],
+    "parameters": {
+      "TCHWSet": {"default": 281.15, "min": 279.15, "max": 283.15, "unit": "K", "description": "Chilled-water setpoint (6-10 degC)"},
+      "roo.QRoo_flow": {"default": 500000, "min": 400000, "max": 600000, "unit": "W", "description": "IT room heat load"}
+    }
+  },
+  "IntegratedPlant": {
+    "file": "",
+    "class_name": "Buildings.Applications.DataCenters.ChillerCooled.Examples.IntegratedPrimarySecondaryEconomizer",
+    "description": "Primary-secondary chiller plant with integrated waterside economizer (Buildings 13.0.0). Candidate in the milestone benchmark.",
+    "libraries": ["Modelica", "Buildings"],
+    "default_stop_time": 86400,
+    "outputs": ["roo.TRooAir", "PHVAC.y", "PIT.y", "EHVAC.y", "EIT.y", "FCTim.y", "PMCTim.y", "FMCHou.y", "swiTim.y"],
+    "parameters": {
+      "TCHWSet": {"default": 281.15, "min": 279.15, "max": 283.15, "unit": "K", "description": "Chilled-water setpoint (6-10 degC)"},
+      "roo.QRoo_flow": {"default": 500000, "min": 400000, "max": 600000, "unit": "W", "description": "IT room heat load"}
+    }
+  },
+  "DXCooledAirside": {
+    "file": "",
+    "class_name": "Buildings.Applications.DataCenters.DXCooled.Examples.DXCooledAirsideEconomizer",
+    "description": "Direct-expansion cooling with airside economizer (Buildings 13.0.0).",
+    "libraries": ["Modelica", "Buildings"],
+    "default_stop_time": 86400,
+    "outputs": ["roo.TRooAir", "PHVAC.y", "PIT.y", "EHVAC.y", "EIT.y"],
+    "parameters": {
+      "roo.QRoo_flow": {"default": 500000, "min": 400000, "max": 600000, "unit": "W", "description": "IT room heat load"}
+    }
   }
 }

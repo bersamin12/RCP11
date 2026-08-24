@@ -15,7 +15,8 @@ class Settings(BaseSettings):
 
     rcp_data_dir: Path = Path("data")
     rcp_om_image: str = "openmodelica/openmodelica:v1.25.0-minimal"
-    rcp_om_backend: str = "auto"  # auto | docker | local
+    rcp_om_backend: str = "auto"  # auto | docker | local | ompython
+    rcp_library_path: str = ""  # colon-separated dirs holding Modelica packages (defaults to vendor/)
     rcp_mailto: str = ""  # OpenAlex polite-pool email
 
 

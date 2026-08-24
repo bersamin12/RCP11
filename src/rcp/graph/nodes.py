@@ -9,6 +9,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 from rcp.config import data_dir
+from rcp.evidence import check_claims
 from rcp.graph.state import RCPState
 from rcp.llm import llm_json
 from rcp.memory.pipeline import build_research_memory
@@ -164,27 +165,70 @@ def run_modelica(state: RCPState) -> dict:
     return {"result_bundle": bundle}
 
 
+def route_after_sim(state: RCPState) -> str:
+    """Send failures to the rollback gate, successes to analysis (PRD §5.4)."""
+    if state.result_bundle and state.result_bundle.status == "ok":
+        return "analyze"
+    return "rollback"
+
+
+def rollback_decision(state: RCPState) -> dict:
+    """Human gate 3 (PRD §5.4): decide retry / revise / abort after a failed run."""
+    if state.auto:
+        return {"rollback_action": "abort"}
+    err = (state.result_bundle.log_excerpt if state.result_bundle else "")[:500]
+    answer = interrupt(
+        {
+            "gate": "rollback",
+            "question": "Simulation failed. Retry, revise the spec, or abort and write the report?",
+            "options": ["retry", "revise", "abort"],
+            "error": err,
+        }
+    )
+    action = str(answer).strip().lower()
+    return {"rollback_action": action if action in {"retry", "revise", "abort"} else "abort"}
+
+
+def route_after_rollback(state: RCPState) -> str:
+    action = state.rollback_action
+    if action == "retry":
+        return "run_modelica"
+    if action == "revise":
+        return "spec_compile"
+    return "draft_report"
+
+
 def analyze_results(state: RCPState) -> dict:
-    """Analysis MVP (PRD M5.1/M5.4): metrics computed numerically; claims via LLM."""
+    """Analysis MVP (PRD M5.1/M5.4): metrics computed numerically; claims via LLM.
+    Provenance is attached (X.3) and claims are consistency-checked (M6.3)."""
     bundle = state.result_bundle
     hyp = state.selected_hypothesis
     assert bundle is not None and hyp is not None
+    spec = state.experiment_spec
     if bundle.status != "ok":
         claims = ClaimBundle(
             hypothesis_id=hyp.id,
+            spec_id=spec.id if spec else "",
+            result_hash=bundle.result_file_hash,
             summary=f"Simulation failed: {bundle.log_excerpt[:300]}",
         )
-        return {"claim_bundle": claims}
+        return {"claim_bundle": claims, "consistency_warnings": []}
     claims = llm_json(
         f"Hypothesis tested: {hyp.statement}\n"
         f"Experiment spec: {state.experiment_spec.model_dump_json() if state.experiment_spec else ''}\n"
         f"Computed metrics (ground truth — every claim must cite these): {json.dumps(bundle.metrics)}\n\n"
-        f"Produce 2-4 claims about whether the results support the hypothesis, each citing "
-        f"specific metric values as evidence, with physical reasoning. Use hypothesis_id '{hyp.id}'.",
+        f"Produce 2-4 claims about whether the results support the hypothesis. Each claim "
+        f"must list the exact metric names it relies on in 'metric_keys' (use only keys "
+        f"present above), cite specific values in 'evidence', and give physical reasoning. "
+        f"Use hypothesis_id '{hyp.id}'.",
         ClaimBundle,
         system="You are an analysis agent. Claims must be tied to the computed metrics and physical constraints — never invent numbers.",
     )
-    return {"claim_bundle": claims}
+    # Attach provenance + run the deterministic consistency check (X.3, M6.3).
+    claims.spec_id = spec.id if spec else ""
+    claims.result_hash = bundle.result_file_hash
+    warnings = check_claims(claims.claims, bundle.metrics)
+    return {"claim_bundle": claims, "consistency_warnings": warnings}
 
 
 def draft_report(state: RCPState) -> dict:
@@ -224,9 +268,17 @@ def draft_report(state: RCPState) -> dict:
             "\n## Conclusion\n", body.conclusion,
             "\n## Claims & Evidence\n",
             "\n".join(
-                f"- **{c.statement}** — evidence: {c.evidence} (confidence: {c.confidence})"
+                f"- **{c.statement}** — evidence: {c.evidence} "
+                f"(metrics: {', '.join(c.metric_keys) or 'none'}; confidence: {c.confidence})"
                 for c in claim_bundle.claims
             ),
+            "\n## Provenance\n",
+            f"- spec id: `{claim_bundle.spec_id or '-'}`\n"
+            f"- spec hash: `{state.result_bundle.spec_hash if state.result_bundle else '-'}`\n"
+            f"- result file hash: `{claim_bundle.result_hash or '-'}`\n",
+            "\n## Consistency Check\n",
+            "\n".join(f"- ⚠ {w}" for w in state.consistency_warnings)
+            if state.consistency_warnings else "- ✅ all claims trace to computed metrics\n",
             "\n## References\n",
             "\n".join(f"{i + 1}. {c.title} ({c.year}) {c.url or ''}" for i, c in enumerate(cards[:12])),
         ]

@@ -17,9 +17,14 @@ from rcp.objects import ResearchTopic
 
 NODE_ORDER = [
     "research_memory_build", "gap_mining", "hypothesis_gen", "select_hypothesis",
-    "spec_compile", "approve_spec", "run_modelica", "analyze_results", "draft_report",
+    "spec_compile", "approve_spec", "run_modelica", "rollback_decision",
+    "analyze_results", "draft_report",
 ]
-GATE_NODES = {"hypothesis_selection": "select_hypothesis", "spec_approval": "approve_spec"}
+GATE_NODES = {
+    "hypothesis_selection": "select_hypothesis",
+    "spec_approval": "approve_spec",
+    "rollback": "rollback_decision",
+}
 
 
 class RunManager:

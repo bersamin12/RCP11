@@ -26,6 +26,7 @@ def build_graph(checkpointer: SqliteSaver | None = None):
     g.add_node("spec_compile", nodes.spec_compile)
     g.add_node("approve_spec", nodes.approve_spec)
     g.add_node("run_modelica", nodes.run_modelica)
+    g.add_node("rollback_decision", nodes.rollback_decision)
     g.add_node("analyze_results", nodes.analyze_results)
     g.add_node("draft_report", nodes.draft_report)
 
@@ -40,7 +41,16 @@ def build_graph(checkpointer: SqliteSaver | None = None):
         nodes.route_after_approval,
         {"run": "run_modelica", "revise": "spec_compile"},
     )
-    g.add_edge("run_modelica", "analyze_results")
+    g.add_conditional_edges(
+        "run_modelica",
+        nodes.route_after_sim,
+        {"analyze": "analyze_results", "rollback": "rollback_decision"},
+    )
+    g.add_conditional_edges(
+        "rollback_decision",
+        nodes.route_after_rollback,
+        {"retry": "run_modelica", "revise": "spec_compile", "abort": "draft_report"},
+    )
     g.add_edge("analyze_results", "draft_report")
     g.add_edge("draft_report", END)
 

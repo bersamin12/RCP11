@@ -30,21 +30,22 @@ relative to the working directory).
 |---|---|---|
 | Standard objects | §5.3 | `src/rcp/objects.py` — the contracts between roles |
 | LangGraph backbone | §5.2, X.2 | `src/rcp/graph/` — SQLite checkpoints, resumable |
-| Human gates | §5.4 | hypothesis selection + spec approval (with revision loop) |
+| Human gates | §5.4 | hypothesis selection + spec approval + failure rollback (each with revision/decision loop) |
 | Research Memory | M1.1–M1.6 | `src/rcp/memory/` — OpenAlex + Semantic Scholar → PaperCards |
 | Idea generation (MVP) | M2.1, M2.3 | gap mining + hypothesis nodes (deepen in Phase 3) |
 | Scientific compiler | M3.1–M3.2 | `spec_compile` node + registry constraint checker |
-| Simulation chain | M4.1, M4.2*, M4.4, M4.5 | `src/rcp/simulation/` — omc via Docker or local |
-| Analysis (MVP) | M5.1, M5.4 | numeric metric engine + LLM ClaimBundle (deepen in Phase 5) |
-| Writing (MVP) | M6.1 | report drafting with evidence links (deepen in Phase 5) |
+| Simulation chain | M4.1, M4.2, M4.4, M4.5 | `src/rcp/simulation/` — OMPython (OMCSessionZMQ) or omc via Docker/local |
+| Analysis (MVP) | M5.1, M5.2, M5.4 | metric engine + comparator + LLM ClaimBundle (deepen in Phase 5) |
+| Writing (MVP) | M6.1, M6.3 | report drafting with evidence links + claim-vs-metric consistency check (deepen in Phase 5) |
+| Evidence & traceability | X.3 | sealed spec + result-file SHA-256 fingerprints, claim-level provenance |
 
-*M4.2: MVP drives `omc` via `.mos` scripts (Docker image or local install). The
-OMPython/`OMCSessionZMQ` interactive backend is the planned upgrade — the runner
-backend is already pluggable (`RCP_OM_BACKEND`).
+*M4.2: the OMPython/`OMCSessionZMQ` backend is implemented (`RCP_OM_BACKEND=ompython`);
+the `.mos`-script backends (local `omc` / Docker) remain the fallback (`RCP_OM_BACKEND=auto`).
 
 ## Simulation backend
 
-Either install OpenModelica locally (`omc` on PATH) or use Docker:
+Install OpenModelica locally (`omc` on PATH, e.g. `conda install -c conda-forge
+openmodelica ompython`) or use Docker:
 
 ```bash
 sudo usermod -aG docker $USER   # then log out/in
@@ -52,9 +53,21 @@ docker pull openmodelica/openmodelica:v1.25.0-minimal
 ```
 
 The bundled `DataCenterRoom` model is self-contained (no Modelica Standard Library
-dependencies). To add Buildings-library models (ChillerCooled, DXCooled): add the
-`.mo`/package reference and an entry in `src/rcp/models_library/registry.json`,
-and extend the `.mos` template in `runner.py` with `installPackage(Buildings)`.
+dependencies). The Buildings-library models (`NonIntegratedPlant`,
+`IntegratedPlant`, `DXCooledAirside`) need the vendored libraries under `vendor/`
+(Modelica 4.1.0 + Buildings 13.0.0 — gitignored; clone them with
+`git clone --depth 1 --branch v4.1.0 https://github.com/modelica/ModelicaStandardLibrary.git vendor/Modelica`
+and
+`git clone --depth 1 --branch v13.0.0 https://github.com/lbl-srg/modelica-buildings.git vendor/Buildings`),
+and load via `setModelicaPath` + `loadModel`. See `RCP_LIBRARY_PATH` to point at a
+different library location.
+
+> **Known limitation:** the Buildings *example* models read a weather file via
+> `Modelica.Utilities.Files.loadResource("modelica://Buildings/...")`, and
+> OpenModelica does not resolve that URI on this setup — the model compiles but
+> fails at initialization with "Not possible to open file". Fix by installing the
+> libraries into OpenModelica's package manager index or pre-resolving the weather
+> resource.
 
 ## Architecture
 
