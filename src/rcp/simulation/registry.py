@@ -26,6 +26,14 @@ class ModelInfo(BaseModel):
     default_stop_time: float = 86400
     outputs: list[str] = Field(default_factory=list)
     parameters: dict[str, ParamSpec] = Field(default_factory=dict)
+    validation_status: str = "unvalidated"
+    model_version: str = "0.0.0"
+    validation_report_id: str | None = None
+    limitations: list[str] = Field(default_factory=list)
+    operating_range: dict[str, dict[str, float | str]] = Field(default_factory=dict)
+    libraries: dict[str, str] = Field(default_factory=dict)
+    metric_profile: str = "default"
+    source: str = "bundled"
 
     @property
     def path(self) -> Path:

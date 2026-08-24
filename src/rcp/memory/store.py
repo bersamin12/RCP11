@@ -19,7 +19,8 @@ class MemoryStore:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def save_snapshot(
-        self, topic: str, raw_papers: list[dict], cards: list[PaperCard], themes: dict
+        self, topic: str, raw_papers: list[dict], cards: list[PaperCard], themes: dict,
+        metadata: dict | None = None,
     ) -> Path:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         snap = self.root / _slug(topic) / stamp
@@ -29,6 +30,7 @@ class MemoryStore:
             json.dumps([c.model_dump() for c in cards], indent=2)
         )
         (snap / "themes.json").write_text(json.dumps(themes, indent=2))
+        (snap / "snapshot_manifest.json").write_text(json.dumps(metadata or {"topic": topic}, indent=2))
         (snap.parent / "latest.json").write_text(json.dumps({"snapshot": stamp}))
         return snap
 

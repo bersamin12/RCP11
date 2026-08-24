@@ -3,6 +3,21 @@
     "file": "DataCenterRoom.mo",
     "class_name": "DataCenterRoom",
     "description": "Lumped thermal model of a data center room: IT heat load, envelope losses, proportional cooling with COP-based electric power. Fast, self-contained (no MSL dependencies).",
+    "validation_status": "conceptual",
+    "model_version": "1.0.0-conceptual",
+    "validation_report_id": "DataCenterRoom-1.0.0-conceptual",
+    "limitations": [
+      "Conceptual, single-zone lumped model; it is not calibrated against a physical facility.",
+      "No spatial hot spots, humidity, airflow network, equipment transients, or sensor uncertainty.",
+      "Cooling uses a proportional controller and constant COP rather than a detailed plant model.",
+      "Successful execution is exploratory evidence and must not be described as publication-strength validation."
+    ],
+    "operating_range": {
+      "Q_it": {"min": 10000, "max": 120000, "unit": "W"},
+      "T_amb": {"min": 10, "max": 40, "unit": "degC"},
+      "T_set": {"min": 18, "max": 30, "unit": "degC"},
+      "T": {"min": 15, "max": 45, "unit": "degC"}
+    },
     "default_stop_time": 86400,
     "outputs": ["T", "Q_cool", "P_cool", "E_cool"],
     "parameters": {
@@ -15,5 +30,63 @@
       "k_p": {"default": 20000, "min": 100, "max": 1000000, "unit": "W/K", "description": "Proportional controller gain"},
       "COP": {"default": 3.5, "min": 1.0, "max": 10.0, "unit": "-", "description": "Cooling coefficient of performance"}
     }
+  },
+  "ChillerCooledIntegrated": {
+    "file": "BuildingsBenchmarks.mo",
+    "class_name": "RCPBenchmarks.ChillerCooledIntegrated",
+    "description": "LBNL Buildings 13.0.0 integrated primary-secondary waterside-economizer benchmark with stable RCP inputs and outputs.",
+    "source": "library-wrapper",
+    "libraries": {"Modelica": "4.1.0", "Buildings": "13.0.0"},
+    "metric_profile": "chiller_benchmark",
+    "validation_status": "library-validated",
+    "model_version": "13.0.0-rcp1",
+    "validation_report_id": "Buildings-13.0.0-ChillerCooledIntegrated",
+    "default_stop_time": 86400,
+    "outputs": ["T_room_K", "P_HVAC_W", "P_IT_W", "E_HVAC_J", "E_IT_J", "free_cooling_s", "partial_mechanical_s", "full_mechanical_s", "mode_switches"],
+    "parameters": {
+      "Q_room": {"default": 500000, "min": 300000, "max": 700000, "unit": "W", "description": "Computer-room heat load"},
+      "T_chw_set": {"default": 281.15, "min": 277.15, "max": 285.15, "unit": "K", "description": "Chilled-water supply setpoint"}
+    },
+    "operating_range": {
+      "Q_room": {"min": 400000, "max": 600000, "unit": "W"},
+      "T_chw_set": {"min": 279.15, "max": 283.15, "unit": "K"},
+      "T_room_K": {"min": 288.15, "max": 318.15, "unit": "K"},
+      "P_HVAC_W": {"min": 0, "max": 2000000, "unit": "W"}
+    },
+    "limitations": [
+      "Library regression validation does not constitute calibration against a physical facility.",
+      "The benchmark uses the DRYCOLD weather profile and a simplified computer-room load model.",
+      "Primary HVAC energy linearly bridges mover-power event samples outside the preregistered 0-2 MW physical screen; raw upstream energy is retained separately.",
+      "Results are valid only for the pinned Buildings and OpenModelica versions."
+    ]
+  },
+  "ChillerCooledNonIntegrated": {
+    "file": "BuildingsBenchmarks.mo",
+    "class_name": "RCPBenchmarks.ChillerCooledNonIntegrated",
+    "description": "LBNL Buildings 13.0.0 non-integrated primary-secondary waterside-economizer benchmark and comparison baseline.",
+    "source": "library-wrapper",
+    "libraries": {"Modelica": "4.1.0", "Buildings": "13.0.0"},
+    "metric_profile": "chiller_benchmark",
+    "validation_status": "library-validated",
+    "model_version": "13.0.0-rcp1",
+    "validation_report_id": "Buildings-13.0.0-ChillerCooledNonIntegrated",
+    "default_stop_time": 86400,
+    "outputs": ["T_room_K", "P_HVAC_W", "P_IT_W", "E_HVAC_J", "E_IT_J", "free_cooling_s", "partial_mechanical_s", "full_mechanical_s", "mode_switches"],
+    "parameters": {
+      "Q_room": {"default": 500000, "min": 300000, "max": 700000, "unit": "W", "description": "Computer-room heat load"},
+      "T_chw_set": {"default": 281.15, "min": 277.15, "max": 285.15, "unit": "K", "description": "Chilled-water supply setpoint"}
+    },
+    "operating_range": {
+      "Q_room": {"min": 400000, "max": 600000, "unit": "W"},
+      "T_chw_set": {"min": 279.15, "max": 283.15, "unit": "K"},
+      "T_room_K": {"min": 288.15, "max": 318.15, "unit": "K"},
+      "P_HVAC_W": {"min": 0, "max": 2000000, "unit": "W"}
+    },
+    "limitations": [
+      "Library regression validation does not constitute calibration against a physical facility.",
+      "The benchmark uses the DRYCOLD weather profile and a simplified computer-room load model.",
+      "Primary HVAC energy linearly bridges mover-power event samples outside the preregistered 0-2 MW physical screen; raw upstream energy is retained separately.",
+      "Results are valid only for the pinned Buildings and OpenModelica versions."
+    ]
   }
 }

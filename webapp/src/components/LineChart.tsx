@@ -1,4 +1,5 @@
 interface Props {
+  title: string;
   time: number[];
   values: number[];
   color: string;
@@ -6,7 +7,7 @@ interface Props {
 }
 
 /** SVG line chart ported from the design prototype (x-axis in hours). */
-export function LineChart({ time, values, color, unit }: Props) {
+export function LineChart({ title, time, values, color, unit }: Props) {
   if (!time.length || !values.length) return null;
   const W = 560, H = 185;
   const P = { l: 50, r: 14, t: 12, b: 28 };
@@ -28,7 +29,8 @@ export function LineChart({ time, values, color, unit }: Props) {
   const xHours = [0, 0.25, 0.5, 0.75, 1].map((f) => f * hoursMax);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={`${title}, ${values.length} samples`} style={{ display: "block" }}>
+      <title>{title}</title>
       {yTicks.map((t, k) => (
         <text key={"yt" + k} x={P.l - 7} y={t.y + 3} textAnchor="end" fontSize={9} fill="#9aa1a9" fontFamily="IBM Plex Mono">
           {t.text}

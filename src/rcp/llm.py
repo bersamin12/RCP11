@@ -2,6 +2,9 @@
 
 import json
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
+from collections.abc import Callable, Iterator
 from typing import TypeVar
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -11,6 +14,36 @@ from pydantic import BaseModel, ValidationError
 from rcp.config import get_settings
 
 T = TypeVar("T", bound=BaseModel)
+_usage_sink: ContextVar[Callable[[dict[str, int]], None] | None] = ContextVar(
+    "rcp_llm_usage_sink", default=None
+)
+
+
+@contextmanager
+def capture_llm_usage(sink: Callable[[dict[str, int]], None]) -> Iterator[None]:
+    token = _usage_sink.set(sink)
+    try:
+        yield
+    finally:
+        _usage_sink.reset(token)
+
+
+def _record_usage(reply) -> None:
+    sink = _usage_sink.get()
+    if sink is None:
+        return
+    usage = getattr(reply, "usage_metadata", None) or {}
+    if not usage:
+        usage = getattr(reply, "response_metadata", {}).get("token_usage", {})
+    normalized = {
+        "input_tokens": int(usage.get("input_tokens", usage.get("prompt_tokens", 0)) or 0),
+        "output_tokens": int(usage.get("output_tokens", usage.get("completion_tokens", 0)) or 0),
+        "total_tokens": int(usage.get("total_tokens", 0) or 0),
+        "requests": 1,
+    }
+    if not normalized["total_tokens"]:
+        normalized["total_tokens"] = normalized["input_tokens"] + normalized["output_tokens"]
+    sink(normalized)
 
 
 def get_chat_model(temperature: float | None = None) -> ChatOpenAI:
@@ -51,6 +84,7 @@ def llm_json(prompt: str, schema: type[T], system: str = "", retries: int = 2) -
     last_err: Exception | None = None
     for _ in range(retries + 1):
         reply = model.invoke(messages)
+        _record_usage(reply)
         text = reply.content if isinstance(reply.content, str) else str(reply.content)
         try:
             return schema.model_validate_json(_extract_json(text))

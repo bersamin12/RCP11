@@ -20,6 +20,8 @@ def dedupe(papers: list[dict]) -> list[dict]:
                 if value and not existing.get(field):
                     existing[field] = value
             existing["citations"] = max(existing.get("citations", 0), p.get("citations", 0))
+            provenance = (existing.get("provenance") or []) + (p.get("provenance") or [p.get("source")])
+            existing["provenance"] = list(dict.fromkeys(value for value in provenance if value))
         else:
             merged[key] = dict(p)
     # Preserve first-seen (relevance) order — sorting by citations here would

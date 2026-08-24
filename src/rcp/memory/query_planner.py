@@ -10,12 +10,16 @@ class QueryPlan(BaseModel):
 
 
 def plan_queries(topic: str, n: int = 4) -> list[str]:
-    plan = llm_json(
-        f"Research topic: {topic}\n\n"
-        f"Produce {n} diverse literature-search queries covering the main methods, "
-        "applications, and adjacent subfields of this topic. Keep each query short "
-        "(3-8 words), as used in academic search engines.",
-        QueryPlan,
-        system="You are a research librarian planning a literature search.",
-    )
-    return plan.queries[:n]
+    try:
+        plan = llm_json(
+            f"Research topic: {topic}\n\n"
+            f"Produce {n} diverse literature-search queries covering the main methods, "
+            "applications, and adjacent subfields of this topic. Keep each query short "
+            "(3-8 words), as used in academic search engines.",
+            QueryPlan,
+            system="You are a research librarian planning a literature search.",
+        )
+        return plan.queries[:n]
+    except Exception:
+        fallbacks = [topic, f"{topic} simulation", f"{topic} optimization", f"{topic} validation"]
+        return list(dict.fromkeys(fallbacks))[:n]

@@ -1,150 +1,119 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { api } from "../api";
+import { api, errorMessage } from "../api";
+import { CredibilityBadge, WarningBanner } from "../components/Credibility";
 import { LineChart } from "../components/LineChart";
-import { ACCENT, METRIC_DISPLAY, fmtMetric } from "../theme";
-import type { Registry, ResultBundle, Series } from "../types";
+import { Alert, Button, EmptyState, LoadingBlock } from "../components/UI";
+import { METRIC_DISPLAY, fmtMetric } from "../theme";
+import type { ModelValidationReport, Registry, ResultBundle, Series } from "../types";
 
 function niceStep(min: number, max: number): number {
   const raw = (max - min) / 100;
-  const mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
-  return Math.max(mag, Math.round(raw / mag) * mag);
+  const magnitude = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  return Math.max(magnitude, Math.round(raw / magnitude) * magnitude);
 }
 
 export function Models() {
   const [registry, setRegistry] = useState<Registry>({});
-  const [modelName, setModelName] = useState<string>("");
-  const [vals, setVals] = useState<Record<string, number>>({});
+  const [modelName, setModelName] = useState("");
+  const [values, setValues] = useState<Record<string, number>>({});
+  const [stopTime, setStopTime] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<ResultBundle | null>(null);
   const [series, setSeries] = useState<Series | null>(null);
   const [error, setError] = useState("");
+  const [validation, setValidation] = useState<ModelValidationReport | null>(null);
+  const [validationError, setValidationError] = useState("");
+  const [showValidation, setShowValidation] = useState(false);
+
+  const loadRegistry = async () => {
+    setLoading(true); setError("");
+    try {
+      const next = await api.models();
+      setRegistry(next);
+      setModelName((current) => current && next[current] ? current : Object.keys(next)[0] ?? "");
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { void loadRegistry(); }, []);
+  const model = registry[modelName];
+  const parameters = useMemo(() => Object.entries(model?.parameters ?? {}), [model]);
 
   useEffect(() => {
-    api.models().then((r) => {
-      setRegistry(r);
-      const first = Object.keys(r)[0];
-      if (first) {
-        setModelName(first);
-        setVals(Object.fromEntries(Object.entries(r[first].parameters).map(([k, p]) => [k, p.default])));
-      }
-    }).catch(() => {});
-  }, []);
+    if (!model) return;
+    setValues(Object.fromEntries(Object.entries(model.parameters).map(([name, parameter]) => [name, parameter.default])));
+    setStopTime(model.default_stop_time);
+    setResult(null); setSeries(null); setError(""); setShowValidation(false);
+  }, [model]);
 
-  const model = registry[modelName];
-  const params = useMemo(() => Object.entries(model?.parameters ?? {}), [model]);
+  useEffect(() => {
+    if (!modelName) return;
+    let active = true;
+    setValidation(null); setValidationError("");
+    api.modelValidation(modelName)
+      .then((next) => active && setValidation(next))
+      .catch((err) => active && setValidationError(errorMessage(err)));
+    return () => { active = false; };
+  }, [modelName]);
+
+  const updateParameter = (name: string, value: number) => {
+    if (!Number.isFinite(value)) return;
+    setValues((current) => ({ ...current, [name]: value }));
+    setResult(null); setSeries(null);
+  };
 
   const run = async () => {
     if (!model || running) return;
-    setRunning(true);
-    setError("");
+    const invalid = parameters.find(([name, parameter]) => !Number.isFinite(values[name]) || values[name] < parameter.min || values[name] > parameter.max);
+    if (invalid) { setError(`${invalid[0]} must be between ${invalid[1].min} and ${invalid[1].max} ${invalid[1].unit}.`); return; }
+    if (!Number.isFinite(stopTime) || stopTime <= 0) { setError("Stop time must be greater than zero seconds."); return; }
+    setRunning(true); setError(""); setResult(null); setSeries(null);
     try {
-      const bundle = await api.simulate(modelName, vals);
+      const bundle = await api.simulate(modelName, values, stopTime);
       setResult(bundle);
-      const s = await api.series(bundle.spec_id);
-      setSeries(s);
-    } catch (err) {
-      setError(String(err).slice(0, 400));
-      setResult(null);
-    } finally {
-      setRunning(false);
-    }
+      setSeries(await api.simulationSeries(bundle.spec_id));
+    } catch (err) { setError(errorMessage(err)); }
+    finally { setRunning(false); }
   };
 
-  if (!model) return null;
-  const keyMetrics = result ? ["T_peak_degC", "E_cool_kWh", "P_cool_avg_W"].filter((k) => k in result.metrics) : [];
+  if (loading) return <LoadingBlock label="Loading model registry…" />;
+  if (!model) return <section><div className="page-header"><div><h1>Models &amp; simulations</h1></div></div>{error ? <Alert tone="danger" title="Registry unavailable"><p>{error}</p><Button onClick={() => void loadRegistry()}>Retry</Button></Alert> : <EmptyState>No simulation models are registered.</EmptyState>}</section>;
 
-  return (
-    <section>
-      <h1 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 14px" }}>Models &amp; simulations</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16, alignItems: "start" }}>
-        <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 10, overflow: "hidden" }}>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid #eceff1" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-              <span className="mono" style={{ fontSize: 13, fontWeight: 600, color: "#0f766e" }}>{modelName}</span>
-            </div>
-            <div style={{ fontSize: 11.5, color: "#6b7280", marginTop: 3, lineHeight: 1.4 }}>{model.description}</div>
-            <div className="mono" style={{ fontSize: 10.5, color: "#9aa1a9", marginTop: 6 }}>
-              outputs: {model.outputs.join(", ")} · default stop {model.default_stop_time}s
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 76px 84px 128px", padding: "7px 16px", background: "#fafbfc", borderBottom: "1px solid #eceff1", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, color: "#9aa1a9", fontWeight: 600 }}>
-            <div>Parameter</div><div style={{ textAlign: "right" }}>Default</div><div style={{ textAlign: "right" }}>Unit</div><div style={{ textAlign: "right" }}>Range</div>
-          </div>
-          {params.map(([name, p]) => (
-            <div key={name} style={{ display: "grid", gridTemplateColumns: "1fr 76px 84px 128px", padding: "8px 16px", borderBottom: "1px solid #f4f5f6", alignItems: "center" }}>
-              <div>
-                <div className="mono" style={{ fontSize: 11.5, fontWeight: 500 }}>{name}</div>
-                <div style={{ fontSize: 10, color: "#9aa1a9" }}>{p.description}</div>
-              </div>
-              <div className="mono" style={{ textAlign: "right", fontSize: 12, color: "#4b5563" }}>{p.default}</div>
-              <div className="mono" style={{ textAlign: "right", fontSize: 11, color: "#8a9099" }}>{p.unit}</div>
-              <div className="mono" style={{ textAlign: "right", fontSize: 11, color: "#9aa1a9" }}>{p.min}–{p.max}</div>
-            </div>
-          ))}
-        </div>
+  const keyMetrics = result ? ["T_peak_degC", "E_cool_kWh", "P_cool_avg_W"].filter((key) => key in result.metrics) : [];
+  return <section>
+    <div className="page-header">
+      <div><h1>Models &amp; simulations</h1><p>Inspect credibility boundaries and run a controlled single-case simulation.</p></div>
+      <label className="model-selector"><span className="field-label">Registered model</span><select className="field mono" value={modelName} onChange={(event) => setModelName(event.target.value)}>{Object.keys(registry).map((name) => <option key={name}>{name}</option>)}</select></label>
+    </div>
 
-        <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 10, padding: "16px 18px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Quick simulate</h3>
-            <span className="mono" style={{ fontSize: 10.5, color: "#9aa1a9" }}>POST /api/simulations</span>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 13, marginBottom: 16 }}>
-            {params.map(([name, p]) => (
-              <div key={name}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                  <span className="mono" style={{ fontSize: 11.5, fontWeight: 500 }}>{name}</span>
-                  <span className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: "#0f766e" }}>
-                    {vals[name]} <span style={{ color: "#9aa1a9", fontWeight: 400 }}>{p.unit}</span>
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={p.min}
-                  max={p.max}
-                  step={niceStep(p.min, p.max)}
-                  value={vals[name] ?? p.default}
-                  onChange={(e) => setVals({ ...vals, [name]: parseFloat(e.target.value) })}
-                  style={{ width: "100%", accentColor: ACCENT, height: 4 }}
-                />
-              </div>
-            ))}
-          </div>
-          <button
-            onClick={run}
-            style={{
-              width: "100%", height: 36, border: 0, borderRadius: 7,
-              background: running ? "#94d3df" : ACCENT, color: "#fff",
-              fontWeight: 600, fontSize: 12.5, cursor: running ? "wait" : "pointer",
-            }}
-          >
-            {running ? "Running OpenModelica…" : "Run simulation →"}
-          </button>
-          {error && (
-            <div className="mono" style={{ marginTop: 10, fontSize: 11, color: "#b91c1c", whiteSpace: "pre-wrap" }}>{error}</div>
-          )}
+    <div className="models-grid">
+      <section className="card model-card" aria-labelledby="model-heading">
+        <div className="model-card-header"><div className="toolbar"><h2 id="model-heading" className="mono">{modelName}</h2><CredibilityBadge status={model.validation_status} /><span className="mono muted">v{model.model_version}</span></div><p>{model.description}</p><div className="mono model-outputs">outputs: {model.outputs.join(", ")} · default stop {model.default_stop_time}s</div></div>
+        <div className="model-disclosure"><WarningBanner>{model.limitations[0] ?? "Review the validation report before interpreting results."}</WarningBanner><Button variant="ghost" aria-expanded={showValidation} onClick={() => setShowValidation(!showValidation)}>{showValidation ? "Hide validation details" : "View validation details"}</Button></div>
+        {showValidation && <div className="validation-panel">
+          {validationError ? <Alert tone="danger">Validation report unavailable: {validationError}</Alert> : !validation ? <LoadingBlock label="Loading validation evidence…" /> : <>
+            <div className="section-heading"><h2>Reference checks</h2><span className="mono">{validation.id} · {validation.checks_status}</span></div>
+            <div className="table-wrap"><table className="data-table"><thead><tr><th>Check</th><th>Status</th><th>Observed</th><th>Tolerance</th></tr></thead><tbody>{validation.reference_cases.map((check) => <tr key={check.id}><td>{check.name}</td><td><span className={`check-state ${check.status}`}>{check.status}</span></td><td>{check.observed}</td><td className="mono">{check.tolerance}</td></tr>)}</tbody></table></div>
+            <details><summary>Assumptions and limitations</summary><ul>{validation.assumptions.map((item) => <li key={item}>{item}</li>)}{validation.limitations.map((item) => <li key={item}>{item}</li>)}</ul></details>
+          </>}
+        </div>}
+        <div className="table-wrap"><table className="data-table"><thead><tr><th>Parameter</th><th>Default</th><th>Unit</th><th>Range</th></tr></thead><tbody>{parameters.map(([name, parameter]) => <tr key={name}><td><b className="mono">{name}</b><small className="parameter-description">{parameter.description}</small></td><td className="mono">{parameter.default}</td><td className="mono">{parameter.unit}</td><td className="mono">{parameter.min}–{parameter.max}</td></tr>)}</tbody></table></div>
+      </section>
 
-          {result && (
-            <div style={{ marginTop: 16, borderTop: "1px solid #eceff1", paddingTop: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-                {keyMetrics.map((key) => {
-                  const d = METRIC_DISPLAY[key] ?? { unit: "", label: key, color: "#4b5563" };
-                  return (
-                    <div key={key} style={{ background: "#fafbfc", border: "1px solid #eceff1", borderRadius: 7, padding: "9px 11px" }}>
-                      <div className="mono" style={{ fontSize: 9.5, color: "#9aa1a9" }}>{key}</div>
-                      <div className="mono" style={{ fontSize: 16, fontWeight: 600, color: d.color }}>
-                        {fmtMetric(key, result.metrics[key])}
-                        <span style={{ fontSize: 9.5, color: "#8a9099", fontWeight: 400 }}> {d.unit}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {series?.T && <LineChart time={series.time ?? []} values={series.T} color="#dc2626" unit="°C" />}
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
+      <section className="card simulation-card" aria-labelledby="simulation-heading">
+        <div className="section-heading"><h2 id="simulation-heading">Quick simulate</h2><span className="mono">single case</span></div>
+        <div className="parameter-controls">{parameters.map(([name, parameter]) => <fieldset key={name} className="parameter-control"><legend><span className="mono">{name}</span><span>{parameter.unit}</span></legend><div className="parameter-inputs"><input aria-label={`${name} slider`} type="range" min={parameter.min} max={parameter.max} step={niceStep(parameter.min, parameter.max)} value={values[name] ?? parameter.default} onChange={(event) => updateParameter(name, Number(event.target.value))} /><input aria-label={`${name} exact value`} className="field mono" type="number" min={parameter.min} max={parameter.max} step="any" value={values[name] ?? parameter.default} onChange={(event) => updateParameter(name, Number(event.target.value))} /></div><small>{parameter.min}–{parameter.max} {parameter.unit}</small></fieldset>)}</div>
+        <label><span className="field-label">Stop time (seconds)</span><input aria-label="Stop time" className="field mono" type="number" min="1" step="1" value={stopTime} onChange={(event) => { setStopTime(Number(event.target.value)); setResult(null); setSeries(null); }} /></label>
+        <Button variant="primary" className="simulation-submit" disabled={running} onClick={() => void run()}>{running ? "Running OpenModelica…" : "Run simulation"}</Button>
+        {error && <Alert tone="danger" title="Simulation unavailable">{error}</Alert>}
+        {result && <div className="simulation-result" aria-live="polite">
+          {result.warnings.length > 0 && <WarningBanner>{result.warnings.join(" ")}</WarningBanner>}
+          <div className="metric-grid">{keyMetrics.map((key) => { const display = METRIC_DISPLAY[key] ?? { unit: "", label: key, color: "var(--text)" }; return <div className="card metric-card" key={key}><span className="mono">{key}</span><strong style={{ color: display.color }}>{fmtMetric(key, result.metrics[key])} <small>{display.unit}</small></strong><small>{display.label}</small></div>; })}</div>
+          {series?.T ? <div className="quick-chart"><h3>Room temperature</h3><LineChart title="Room temperature" time={series.time ?? []} values={series.T} color="#dc4c4c" unit="°C" /></div> : <Alert tone="warning">The simulation completed, but no room-temperature series was returned.</Alert>}
+        </div>}
+      </section>
+    </div>
+  </section>;
 }

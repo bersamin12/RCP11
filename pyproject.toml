@@ -16,6 +16,12 @@ dependencies = [
     "rich>=13.0",
     "fastapi>=0.111",
     "uvicorn>=0.30",
+    "python-docx>=1.1",
+    "reportlab>=4.2",
+    "pillow>=10.0",
+    # Full-text reading of cached open-access PDFs. MIT and pure Python; per-page
+    # extract_text() retains page numbers, which findings cite. PyMuPDF is AGPL.
+    "pypdf>=5.1",
 ]
 
 [project.optional-dependencies]

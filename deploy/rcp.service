@@ -1,0 +1,45 @@
+# RCP platform service unit. Install with:
+#   sudo cp deploy/rcp.service /etc/systemd/system/rcp.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now rcp
+# Adjust User= and the two absolute paths if the checkout lives elsewhere.
+
+[Unit]
+Description=RCP2026/11 research platform
+After=network-online.target docker.service tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=administrator
+Group=administrator
+
+# Must be the repo root. Both .env (pydantic-settings reads env_file=".env") and
+# the data directory (Settings.rcp_data_dir defaults to a relative Path("data"))
+# resolve against the working directory -- get this wrong and the service starts
+# with no API key and writes a fresh, empty data/ somewhere unexpected.
+WorkingDirectory=/mnt/berstorage/RCP/rcp-platform
+ExecStart=/mnt/berstorage/RCP/rcp-platform/.venv/bin/rcp serve --host 127.0.0.1 --port 8787
+Environment=PYTHONUNBUFFERED=1
+
+Restart=on-failure
+RestartSec=5
+
+# The OpenModelica backend shells out to `docker run` with a 1200 s timeout
+# (src/rcp/simulation/runner.py). systemd's 90 s default would SIGKILL a
+# simulation mid-flight and leave a half-written run directory behind.
+TimeoutStopSec=120
+KillMode=mixed
+
+# Hardening that is safe for this app. Deliberately NOT set:
+#   ProtectSystem=strict  -> data/ goes read-only, data_dir()'s mkdir fails,
+#                            and every run dies
+#   ProtectHome=yes       -> hides ~/.docker/config.json and breaks the docker CLI
+#   PrivateNetwork=yes    -> no OpenRouter, no OpenAlex
+# PrivateTmp is safe: the `-e HOME=/tmp` in runner.py applies inside the container.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ReadWritePaths=/mnt/berstorage/RCP/rcp-platform
+
+[Install]
+WantedBy=multi-user.target

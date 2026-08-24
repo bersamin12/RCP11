@@ -1,481 +1,237 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
-import { api, fmtElapsed, useRunRecord } from "../api";
-import { ConfidenceBadge, PendingMessage, StatusBadge } from "../components/Badges";
-import { LineChart } from "../components/LineChart";
-import { Markdown } from "../components/Markdown";
-import { ACCENT, NODE_DEFS, STAGES, METRIC_DISPLAY, fmtMetric, nodeIndex } from "../theme";
-import type { Registry, Series } from "../types";
+import { api, errorMessage, fmtElapsed, useRunRecord } from "../api";
+import { ConfidenceBadge } from "../components/Badges";
+import { ComparisonVisuals } from "../components/ComparisonVisuals";
+import { CredibilityBadge } from "../components/Credibility";
+import { EvidenceInspector } from "../components/EvidenceInspector";
+import { LiteratureTriage } from "../components/LiteratureTriage";
+import { PdfReaderPane } from "../components/PdfReaderPane";
+import { ReportWorkspace } from "../components/ReportWorkspace";
+import { HypothesisRanking, ResearchIntelligence } from "../components/ResearchIntelligence";
+import { EvaluationRubric } from "../components/EvaluationRubric";
+import { LineageBreadcrumb, ResearchReviewPanel } from "../components/ResearchReview";
+import { RunOutcome } from "../components/RunOutcome";
+import { ScientificChart } from "../components/ScientificChart";
+import { useToast } from "../components/Toast";
+import { Alert, Button, EmptyState, LoadingBlock } from "../components/UI";
+import { WorkflowPhases } from "../components/WorkflowPhases";
+import { METRIC_DISPLAY, NODE_DEFS, fmtMetric } from "../theme";
+import type { AnalysisRevision, AnnotationDraft, EvidenceAnnotation, ExperimentResultSet, MetricComparison, Series, TriageEntry } from "../types";
 
-type TabKey = "papers" | "gaps" | "exp" | "results" | "report" | "claims";
+type TabKey = "overview" | "literature" | "intelligence" | "experiment" | "results" | "report" | "claims";
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "overview", label: "Overview" }, { key: "literature", label: "Literature" },
+  { key: "intelligence", label: "Intelligence" },
+  { key: "experiment", label: "Experiment" }, { key: "results", label: "Results" },
+  { key: "report", label: "Report" }, { key: "claims", label: "Claims" },
+];
 
-export function RunDetail({ runId, goDashboard }: { runId: string; goDashboard: () => void }) {
-  const record = useRunRecord(runId);
-  const [tab, setTab] = useState<TabKey>("gaps");
-  const [feedback, setFeedback] = useState("");
-  const [series, setSeries] = useState<Series | null>(null);
-  const [report, setReport] = useState("");
-  const [registry, setRegistry] = useState<Registry>({});
-  const [, tick] = useState(0);
-
-  useEffect(() => {
-    api.models().then(setRegistry).catch(() => {});
-  }, []);
-
-  // elapsed ticker while alive
-  useEffect(() => {
-    const t = window.setInterval(() => tick((x) => x + 1), 1000);
-    return () => window.clearInterval(t);
-  }, []);
-
-  const state = record?.state ?? {};
-  const status = record?.status ?? "running";
-
-  // fetch series/report once available
-  useEffect(() => {
-    if (state.result_bundle?.status === "ok" && !series) api.series(runId).then(setSeries).catch(() => {});
-    if (state.report_path && !report) api.report(runId).then(setReport).catch(() => {});
-  }, [state.result_bundle?.status, state.report_path]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const doneNodes = useMemo(() => new Set((record?.node_history ?? []).map((n) => n.node)), [record]);
-
-  if (!record) return <PendingMessage>Loading run…</PendingMessage>;
-
-  const currentIdx = nodeIndex(record.current_node);
-  const spec = state.experiment_spec;
-  const model = spec ? registry[spec.model_name] : undefined;
-
-  const specRows = spec
-    ? Object.entries(spec.parameters).map(([name, value]) => {
-        const p = model?.parameters[name];
-        return {
-          name, value: String(value),
-          desc: p?.description ?? "", range: p ? `${p.min}–${p.max} ${p.unit}` : "",
-        };
-      })
-    : [];
-
-  const answerGate = (answer: string) => {
-    setFeedback("");
-    api.answerGate(runId, answer).catch(() => {});
-  };
-
-  const gate = record.status === "waiting_gate" ? record.gate : null;
-
-  const tabDefs: { key: TabKey; label: string; ready: boolean; count?: number }[] = [
-    { key: "papers", label: "Papers", ready: !!state.paper_cards?.length, count: state.paper_cards?.length },
-    { key: "gaps", label: "Gaps & Hypotheses", ready: !!state.hypotheses?.length, count: state.hypotheses?.length },
-    { key: "exp", label: "Experiment", ready: !!spec },
-    { key: "results", label: "Results", ready: !!state.result_bundle },
-    { key: "report", label: "Report", ready: !!state.report_path },
-    { key: "claims", label: "Claims", ready: !!state.claim_bundle, count: state.claim_bundle?.claims?.length },
-  ];
-
-  return (
-    <section>
-      <button onClick={goDashboard} style={{ background: "none", border: 0, color: "#6b7280", fontSize: 12, cursor: "pointer", padding: 0, marginBottom: 12 }}>
-        &larr; Runs
-      </button>
-
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 16 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 3 }}>
-            <h1 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>{record.topic}</h1>
-            <StatusBadge status={status} />
-          </div>
-          <div className="mono" style={{ display: "flex", flexWrap: "wrap", gap: "2px 14px", alignItems: "center", fontSize: 11.5, color: "#8a9099" }}>
-            <span>{record.run_id}</span>
-            <span>·</span>
-            <span>elapsed {fmtElapsed(record)}</span>
-            <span>·</span>
-            <span>{record.constraints.length ? record.constraints.join(" · ") : "no constraints"}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* STEPPER */}
-      <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 10, padding: "16px 14px 12px", marginBottom: 14, overflowX: "auto" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", minWidth: 880 }}>
-          {NODE_DEFS.map((nd, i) => {
-            const stg = STAGES[nd.stage];
-            let st: "done" | "running" | "failed" | "pending" = "pending";
-            if (doneNodes.has(nd.id) && i !== currentIdx) st = "done";
-            if (i === currentIdx && (status === "running" || status === "waiting_gate")) st = "running";
-            if (status === "failed" && i === currentIdx) st = "failed";
-            if (status === "done" || (status === "stale" && doneNodes.size === 0)) st = status === "done" ? "done" : st;
-
-            const base = {
-              width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center",
-              justifyContent: "center", fontSize: 11, fontWeight: 700, flex: "0 0 auto", zIndex: 1,
-            } as const;
-            let circle: React.CSSProperties = { ...base };
-            let icon: React.ReactNode = nd.gate ? "◇" : i + 1;
-            let labelColor = "#9aa1a9";
-            if (st === "done") {
-              circle = { ...base, background: stg.c, color: "#fff" };
-              icon = "✓"; labelColor = "#374151";
-            } else if (st === "running") {
-              circle = { ...base, background: stg.bg, color: stg.c, border: `2px solid ${stg.c}`, boxShadow: `0 0 0 4px ${stg.c}22`, animation: "pulse 1.2s infinite" };
-              icon = nd.gate ? "!" : i + 1; labelColor = stg.c;
-            } else if (st === "failed") {
-              circle = { ...base, background: "#fef2f2", color: "#dc2626", border: "2px solid #dc2626" };
-              icon = "✕"; labelColor = "#b91c1c";
-            } else {
-              circle = { ...base, background: "#fff", color: "#b0b6bd", border: "1.5px solid #e0e3e6" };
-            }
-            const prevDone = i > 0 && doneNodes.has(NODE_DEFS[i - 1].id);
-            const line = (done: boolean): React.CSSProperties => ({ flex: 1, height: 2, background: done ? stg.c : "#e8ebed" });
-            return (
-              <div key={nd.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, position: "relative" }}>
-                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-                  <div style={i === 0 ? { flex: 1, height: 2, background: "transparent" } : line(prevDone)} />
-                  <div style={circle}>{icon}</div>
-                  <div style={i === NODE_DEFS.length - 1 ? { flex: 1, height: 2, background: "transparent" } : line(st === "done")} />
-                </div>
-                <div style={{ marginTop: 7, textAlign: "center", padding: "0 4px" }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.15, color: labelColor }}>{nd.label}</div>
-                  <div className="mono" style={{ fontSize: 9, color: "#aab0b7", marginTop: 2 }}>{nd.id}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* FAILURE BANNER */}
-      {status === "failed" && record.error && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 14, fontSize: 12, color: "#b91c1c" }}>
-          <b>Run failed · </b>
-          <span className="mono">{record.error.slice(0, 400)}</span>
-        </div>
-      )}
-
-      {/* GATE 1 */}
-      {gate?.gate === "hypothesis_selection" && (
-        <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "16px 18px", marginBottom: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-            <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: "#b45309", background: "#fef3c7", padding: "2px 7px", borderRadius: 5, letterSpacing: 0.5 }}>GATE 1</span>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#92400e" }}>Hypothesis selection</h3>
-          </div>
-          <p style={{ margin: "0 0 13px", color: "#a16207", fontSize: 12.5 }}>Which hypothesis should we compile into an experiment?</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 11 }}>
-            {(state.hypotheses ?? []).map((h, i) => (
-              <div key={h.id} style={{ background: "#fff", border: "1px solid #f0e0b0", borderRadius: 9, padding: "13px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8" }}>{h.id}</span>
-                </div>
-                <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.35 }}>{h.statement}</div>
-                <div style={{ fontSize: 11.5, color: "#6b7280", lineHeight: 1.4 }}>{h.rationale}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11, color: "#4b5563" }}>
-                  <div><span style={{ color: "#9aa1a9" }}>expect · </span>{h.expected_effect || "—"}</div>
-                  <div><span style={{ color: "#9aa1a9" }}>risks · </span>{h.risks?.join(", ") || "—"}</div>
-                </div>
-                <button
-                  onClick={() => answerGate(String(i))}
-                  style={{ marginTop: "auto", height: 30, border: 0, borderRadius: 6, background: "#1d4ed8", color: "#fff", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
-                >
-                  Select {h.id}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* GATE 2 */}
-      {gate?.gate === "spec_approval" && spec && (
-        <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "16px 18px", marginBottom: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-            <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: "#b45309", background: "#fef3c7", padding: "2px 7px", borderRadius: 5, letterSpacing: 0.5 }}>GATE 2</span>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#92400e" }}>Experiment spec approval</h3>
-            <span className="mono" style={{ marginLeft: "auto", fontSize: 11, color: "#a16207" }}>attempt {state.spec_attempts ?? 1} of 3</span>
-          </div>
-          <p style={{ margin: "0 0 12px", color: "#a16207", fontSize: 12.5 }}>
-            Approve this experiment specification, or request changes to route back to spec_compile.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-            <div style={{ background: "#fff", border: "1px solid #f0e0b0", borderRadius: 9, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 88px 118px", padding: "7px 12px", background: "#fafbfc", borderBottom: "1px solid #eceff1", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, color: "#9aa1a9", fontWeight: 600 }}>
-                <div>Parameter</div><div style={{ textAlign: "right" }}>Value</div><div style={{ textAlign: "right" }}>Range · unit</div>
-              </div>
-              {specRows.map((p) => (
-                <div key={p.name} style={{ display: "grid", gridTemplateColumns: "1fr 88px 118px", padding: "8px 12px", borderBottom: "1px solid #f4f5f6", alignItems: "center" }}>
-                  <div>
-                    <div className="mono" style={{ fontSize: 11.5, fontWeight: 500 }}>{p.name}</div>
-                    <div style={{ fontSize: 10, color: "#9aa1a9" }}>{p.desc}</div>
-                  </div>
-                  <div className="mono" style={{ textAlign: "right", fontSize: 12, fontWeight: 600, color: "#0f766e" }}>{p.value}</div>
-                  <div className="mono" style={{ textAlign: "right", fontSize: 10.5, color: "#9aa1a9" }}>{p.range}</div>
-                </div>
-              ))}
-              <div className="mono" style={{ display: "flex", gap: 16, padding: "9px 12px", background: "#fafbfc", fontSize: 11 }}>
-                <span style={{ color: "#9aa1a9" }}>stop_time <span style={{ color: "#4b5563" }}>{spec.stop_time}s</span></span>
-                <span style={{ color: "#9aa1a9" }}>intervals <span style={{ color: "#4b5563" }}>{spec.intervals}</span></span>
-                <span style={{ color: "#9aa1a9" }}>model <span style={{ color: "#4b5563" }}>{spec.model_name}</span></span>
-              </div>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ fontSize: 11.5, color: "#6b7280", lineHeight: 1.45, marginBottom: 10 }}>{spec.description}</div>
-              <button
-                onClick={() => answerGate("yes")}
-                style={{ height: 34, border: 0, borderRadius: 7, background: "#16a34a", color: "#fff", fontWeight: 600, fontSize: 12.5, cursor: "pointer", marginBottom: 12 }}
-              >
-                Approve &amp; run simulation
-              </button>
-              <label style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, color: "#8a9099", fontWeight: 600, marginBottom: 5 }}>Request changes</label>
-              <textarea
-                className="amber"
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Describe the revision — routes back to spec_compile"
-                style={{ flex: 1, minHeight: 64, border: "1px solid #d7dbdf", borderRadius: 7, padding: "8px 10px", fontSize: 12, resize: "vertical", outline: "none", marginBottom: 9 }}
-              />
-              <button
-                onClick={() => feedback.trim() && answerGate(feedback.trim())}
-                style={{ height: 30, border: "1px solid #e0c48a", borderRadius: 7, background: "#fff", color: "#b45309", fontWeight: 600, fontSize: 12, cursor: "pointer" }}
-              >
-                Reject &amp; revise &rarr;
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TABS */}
-      <div style={{ display: "flex", gap: 3, borderBottom: "1px solid #e4e7ea", marginBottom: 16, overflowX: "auto" }}>
-        {tabDefs.map((t) => {
-          const on = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                position: "relative", height: 34, padding: "0 13px", border: 0, background: "none",
-                fontSize: 12.5, fontWeight: on ? 600 : 500,
-                color: on ? "#0e7490" : t.ready ? "#4b5563" : "#b0b6bd",
-                cursor: "pointer", borderBottom: `2px solid ${on ? ACCENT : "transparent"}`,
-                display: "flex", alignItems: "center", gap: 6,
-              }}
-            >
-              {t.label}
-              {!!t.count && (
-                <span className="mono" style={{ fontSize: 10, background: on ? "#ecfeff" : "#f1f3f4", color: on ? "#0e7490" : "#8a9099", padding: "0 5px", borderRadius: 8 }}>
-                  {t.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <div style={{ minHeight: 180 }}>
-        {tab === "papers" &&
-          (state.paper_cards?.length ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 11 }}>
-              {state.paper_cards.map((p) => (
-                <div key={p.id} style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "13px 15px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 5 }}>
-                    <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.35 }}>{p.title}</div>
-                    <span className="mono" style={{ fontSize: 11, color: "#8a9099", whiteSpace: "nowrap" }}>{p.year ?? "—"}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#8a9099", marginBottom: 8 }}>
-                    {p.authors.slice(0, 3).join(", ")} · {p.venue ?? "—"} · {p.citations} cites
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 11.5, color: "#4b5563", lineHeight: 1.4 }}>
-                    <div><span style={{ color: "#0e7490", fontWeight: 600 }}>problem </span>{p.problem}</div>
-                    <div><span style={{ color: "#0f766e", fontWeight: 600 }}>method </span>{p.method}</div>
-                    <div><span style={{ color: "#b45309", fontWeight: 600 }}>limits </span>{p.limitations.join("; ") || "—"}</div>
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 9 }}>
-                    {p.tags.map((t) => (
-                      <span key={t} className="mono" style={{ fontSize: 10, background: "#f1f3f4", color: "#6b7280", padding: "2px 6px", borderRadius: 4 }}>{t}</span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <PendingMessage>Papers appear after <span className="mono">research_memory_build</span> completes.</PendingMessage>
-          ))}
-
-        {tab === "gaps" &&
-          (state.hypotheses?.length ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 16 }}>
-              <div>
-                <h3 style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4, color: "#0e7490", margin: "0 0 9px" }}>Research gaps</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {(state.gaps ?? []).map((g, i) => (
-                    <div key={i} style={{ background: "#fff", border: "1px solid #e4e7ea", borderLeft: "3px solid #0891b2", borderRadius: 7, padding: "10px 13px", fontSize: 12, lineHeight: 1.4, color: "#374151" }}>
-                      {g}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h3 style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: 0.4, color: "#1d4ed8", margin: "0 0 9px" }}>Hypotheses</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                  {state.hypotheses.map((h) => {
-                    const selected = state.selected_hypothesis?.id === h.id;
-                    return (
-                      <div
-                        key={h.id}
-                        style={{
-                          background: "#fff", border: `1px solid ${selected ? "#93c5fd" : "#e4e7ea"}`,
-                          borderRadius: 9, padding: "12px 14px",
-                          boxShadow: selected ? "0 0 0 3px #2563eb18" : "none",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                          <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: "#1d4ed8" }}>{h.id}</span>
-                          {selected && (
-                            <span className="mono" style={{ fontSize: 9.5, fontWeight: 700, color: "#15803d", background: "#dcfce7", padding: "1px 6px", borderRadius: 4 }}>SELECTED</span>
-                          )}
-                        </div>
-                        <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.35, marginBottom: 5 }}>{h.statement}</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                          {h.variables.map((v) => (
-                            <span key={v} className="mono" style={{ fontSize: 10, background: "#eff6ff", color: "#1d4ed8", padding: "2px 6px", borderRadius: 4 }}>{v}</span>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <PendingMessage>Gaps &amp; hypotheses appear after <span className="mono">hypothesis_gen</span>.</PendingMessage>
-          ))}
-
-        {tab === "exp" &&
-          (spec ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-              <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, overflow: "hidden" }}>
-                <div style={{ padding: "10px 14px", borderBottom: "1px solid #eceff1", display: "flex", alignItems: "center", gap: 9 }}>
-                  <span className="mono" style={{ fontSize: 11.5, fontWeight: 600, color: "#0f766e" }}>{spec.model_name}</span>
-                  <span className="mono" style={{ fontSize: 10.5, color: "#9aa1a9" }}>{spec.id}</span>
-                </div>
-                {specRows.map((p) => (
-                  <div key={p.name} style={{ display: "grid", gridTemplateColumns: "1fr 96px 120px", padding: "8px 14px", borderBottom: "1px solid #f4f5f6", alignItems: "center" }}>
-                    <div>
-                      <div className="mono" style={{ fontSize: 11.5, fontWeight: 500 }}>{p.name}</div>
-                      <div style={{ fontSize: 10, color: "#9aa1a9" }}>{p.desc}</div>
-                    </div>
-                    <div className="mono" style={{ textAlign: "right", fontSize: 12, fontWeight: 600, color: "#0f766e" }}>{p.value}</div>
-                    <div className="mono" style={{ textAlign: "right", fontSize: 10.5, color: "#9aa1a9" }}>{p.range}</div>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-                <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "13px 15px" }}>
-                  <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, color: "#8a9099", marginBottom: 7 }}>Run status</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                    <StatusBadge status={state.result_bundle ? (state.result_bundle.status === "ok" ? "done" : "failed") : "running"} />
-                    <span className="mono" style={{ fontSize: 11, color: "#8a9099" }}>stop {spec.stop_time}s · {spec.intervals} pts</span>
-                  </div>
-                </div>
-                {state.result_bundle?.status === "failed" && (
-                  <div style={{ background: "#1a1d21", borderRadius: 9, padding: "13px 15px", overflow: "auto" }}>
-                    <div className="mono" style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 0.4, color: "#f87171", marginBottom: 7 }}>log excerpt · run.mos</div>
-                    <pre className="mono" style={{ margin: 0, fontSize: 11, color: "#e5e7eb", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{state.result_bundle.log_excerpt}</pre>
-                  </div>
-                )}
-                <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "13px 15px", fontSize: 11.5, color: "#6b7280", lineHeight: 1.45 }}>
-                  {spec.description || "No description."}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <PendingMessage>The spec appears after <span className="mono">spec_compile</span>.</PendingMessage>
-          ))}
-
-        {tab === "results" &&
-          (state.result_bundle?.status === "ok" ? (
-            <div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
-                {Object.entries(state.result_bundle.metrics).map(([key, value]) => {
-                  const d = METRIC_DISPLAY[key] ?? { unit: "", label: key, color: "#4b5563" };
-                  return (
-                    <div key={key} style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "12px 14px" }}>
-                      <div className="mono" style={{ fontSize: 10, color: "#9aa1a9", marginBottom: 4 }}>{key}</div>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                        <span className="mono" style={{ fontSize: 21, fontWeight: 600, color: d.color }}>{fmtMetric(key, value)}</span>
-                        <span className="mono" style={{ fontSize: 11, color: "#8a9099" }}>{d.unit}</span>
-                      </div>
-                      <div style={{ fontSize: 10.5, color: "#8a9099", marginTop: 3 }}>{d.label}</div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12 }}>
-                <ChartCard title="Room temperature T" color="#dc2626" unit="°C" series={series} column="T" />
-                <ChartCard title="Cooling power P_cool" color="#0f766e" unit="W" series={series} column="P_cool" />
-              </div>
-            </div>
-          ) : (
-            <PendingMessage>Metrics &amp; charts appear after <span className="mono">run_modelica</span> &amp; <span className="mono">analyze_results</span>.</PendingMessage>
-          ))}
-
-        {tab === "report" &&
-          (report ? (
-            <div style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 10, padding: "clamp(16px, 5vw, 34px) clamp(16px, 6vw, 44px)", maxWidth: 720, width: "100%" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span className="mono" style={{ fontSize: 10.5, color: "#9aa1a9" }}>data/runs/{runId}/report.md</span>
-                  <span className="mono" style={{ fontSize: 10.5, color: "#0e7490" }}>markdown</span>
-                </div>
-                <Markdown source={report} />
-              </div>
-            </div>
-          ) : (
-            <PendingMessage>The report appears after <span className="mono">draft_report</span>.</PendingMessage>
-          ))}
-
-        {tab === "claims" &&
-          (state.claim_bundle ? (
-            <div style={{ maxWidth: 820 }}>
-              {state.claim_bundle.summary && (
-                <div style={{ background: "#f5f3ff", border: "1px solid #e5deff", borderRadius: 9, padding: "13px 16px", marginBottom: 12, fontSize: 12.5, color: "#5b21b6", lineHeight: 1.5 }}>
-                  <span style={{ fontWeight: 600 }}>Summary · </span>
-                  {state.claim_bundle.summary}
-                </div>
-              )}
-              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                {state.claim_bundle.claims.map((c, i) => (
-                  <div key={i} style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "13px 16px", display: "flex", gap: 14, alignItems: "flex-start" }}>
-                    <ConfidenceBadge level={c.confidence} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 12.5, lineHeight: 1.4, marginBottom: 4 }}>{c.statement}</div>
-                      <div style={{ fontSize: 11.5, color: "#6b7280", lineHeight: 1.45 }}>
-                        <span className="mono" style={{ color: "#7c3aed" }}>evidence · </span>
-                        {c.evidence}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <PendingMessage>Claims appear after <span className="mono">analyze_results</span>.</PendingMessage>
-          ))}
-      </div>
-    </section>
-  );
+function ComparisonTable({ comparisons, onEvidence }: { comparisons: MetricComparison[]; onEvidence: (id: string) => void }) {
+  if (!comparisons.length) return <EmptyState>No matched comparisons are available for this revision.</EmptyState>;
+  return <div className="card table-wrap"><table className="data-table"><thead><tr><th>Pair</th><th>Metric</th><th>Baseline</th><th>Candidate</th><th>Change</th><th>Assessment</th></tr></thead><tbody>{comparisons.map((item) => <tr key={item.id} className="clickable-row"><td><button className="evidence-table-link mono" onClick={() => onEvidence(item.id)} aria-label={`Inspect evidence ${item.id}`}>{item.pair_id.replace("pair-", "")}</button></td><td>{item.metric}</td><td className="mono">{fmtMetric(item.metric, item.baseline_value)} {item.unit}</td><td className="mono">{fmtMetric(item.metric, item.candidate_value)} {item.unit}</td><td className="mono">{item.percent_delta == null ? "—" : `${item.percent_delta >= 0 ? "+" : ""}${item.percent_delta.toFixed(2)}%`}</td><td><span className={`comparison-result ${item.candidate_better === true ? "better" : item.candidate_better === false ? "worse" : "tie"}`}>{item.candidate_better === true ? "candidate better" : item.candidate_better === false ? "candidate worse" : "tie / neutral"}</span></td></tr>)}</tbody></table></div>;
 }
 
-function ChartCard({ title, color, unit, series, column }: { title: string; color: string; unit: string; series: Series | null; column: string }) {
-  return (
-    <div style={{ background: "#fff", border: "1px solid #e4e7ea", borderRadius: 9, padding: "14px 12px 10px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px", marginBottom: 6 }}>
-        <span style={{ width: 12, height: 2.5, background: color, borderRadius: 2 }} />
-        <span style={{ fontSize: 12, fontWeight: 600 }}>{title}</span>
-        <span className="mono" style={{ fontSize: 10.5, color: "#9aa1a9", marginLeft: "auto" }}>{unit} vs time</span>
-      </div>
-      {series?.[column] ? (
-        <LineChart time={series.time ?? []} values={series[column]} color={color} unit={unit} />
-      ) : (
-        <div style={{ padding: 30, textAlign: "center", color: "#9aa1a9", fontSize: 12 }}>loading series…</div>
-      )}
+export function RunDetail({ runId, goDashboard, openRun }: { runId: string; goDashboard: () => void; openRun: (id: string) => void }) {
+  const { record, error: recordError, refresh } = useRunRecord(runId);
+  const notify = useToast();
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get("tab") as TabKey | null;
+  const tab: TabKey = TABS.some((item) => item.key === requestedTab) ? requestedTab! : "overview";
+  const [analysisRevisions, setAnalysisRevisions] = useState<AnalysisRevision[]>([]);
+  const [results, setResults] = useState<ExperimentResultSet | null>(null);
+  const [series, setSeries] = useState<Series | null>(null);
+  const [seriesError, setSeriesError] = useState("");
+  const [gateBusy, setGateBusy] = useState(false);
+  const [gateError, setGateError] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [showRawPower, setShowRawPower] = useState(false);
+  const [triageEntries, setTriageEntries] = useState<Record<string, TriageEntry>>({});
+  const [annotations, setAnnotations] = useState<EvidenceAnnotation[]>([]);
+  const [annotationBusy, setAnnotationBusy] = useState(false);
+
+  const state = record?.state ?? {};
+  const triagePapers = record?.status === "waiting_gate" && record.gate?.gate === "literature_triage"
+    ? record.gate.papers ?? [] : [];
+  const liveResults = state.experiment_results ?? null;
+  const currentRevisionId = liveResults?.analysis_revision_id ?? "";
+  const selectedRevisionId = params.get("revision") || currentRevisionId;
+  const evidenceId = params.get("evidence") || "";
+
+  const updateParams = (changes: Record<string, string | null>) => {
+    const next = new URLSearchParams(params);
+    Object.entries(changes).forEach(([key, value]) => value ? next.set(key, value) : next.delete(key));
+    setParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if (!liveResults || liveResults.status === "pending") { setResults(liveResults); return; }
+    let active = true;
+    const request = selectedRevisionId && selectedRevisionId !== currentRevisionId
+      ? api.analysisRevision(runId, selectedRevisionId) : api.results(runId);
+    request.then((value) => active && setResults(value)).catch((err) => { if (active) { setResults(liveResults); notify(errorMessage(err)); } });
+    api.analysisRevisions(runId).then((value) => active && setAnalysisRevisions(value)).catch((err) => active && notify(errorMessage(err)));
+    return () => { active = false; };
+  }, [runId, currentRevisionId, liveResults?.status, selectedRevisionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const successfulCases = results?.cases.filter((item) => item.status === "ok") ?? [];
+  const selectedCaseId = params.get("case") || successfulCases[0]?.case_id || "";
+  const selectedResult = successfulCases.find((item) => (item.case_id || item.spec_id) === selectedCaseId) ?? successfulCases[0] ?? state.result_bundle ?? null;
+
+  useEffect(() => {
+    if (!selectedResult || selectedResult.status !== "ok") { setSeries(null); return; }
+    let active = true;
+    setSeries(null); setSeriesError("");
+    api.series(runId, selectedResult.case_id || selectedResult.spec_id, selectedRevisionId || undefined)
+      .then((value) => active && setSeries(value))
+      .catch((err) => { if (active) setSeriesError(errorMessage(err)); });
+    return () => { active = false; };
+  }, [runId, selectedResult?.case_id, selectedResult?.spec_id, selectedRevisionId]);
+
+  // Seed the triage form from the paper-id set, never from `record` identity: the
+  // SSE stream replaces the whole record roughly every 0.7s while a run is waiting
+  // at a gate, which would otherwise wipe a half-typed exclusion reason.
+  const triagePaperKey = triagePapers.map((paper) => paper.id).join(",");
+  useEffect(() => {
+    if (!triagePaperKey) return;
+    setTriageEntries((current) => {
+      const next = { ...current };
+      for (const id of triagePaperKey.split(",")) {
+        if (!next[id]) next[id] = { paper_id: id, decision: "include", reason: "", note: "" };
+      }
+      return next;
+    });
+  }, [triagePaperKey]);
+
+  useEffect(() => {
+    let active = true;
+    api.annotations(runId)
+      .then((value) => { if (active) setAnnotations(value); })
+      .catch(() => { if (active) setAnnotations([]); });
+    return () => { active = false; };
+  }, [runId]);
+
+  const saveAnnotation = async (draft: AnnotationDraft) => {
+    setAnnotationBusy(true);
+    try {
+      const created = await api.createAnnotation(runId, draft);
+      setAnnotations((current) => [...current, created]);
+      notify("Annotation saved.", "success");
+    } finally { setAnnotationBusy(false); }
+  };
+
+  const resolveAnnotationById = async (annotationId: string) => {
+    setAnnotationBusy(true);
+    try {
+      await api.resolveAnnotation(runId, annotationId, "Resolved by the supervisor.", "supervisor");
+      setAnnotations(await api.annotations(runId));
+      notify("Annotation resolved.", "success");
+    } catch (err) { notify(errorMessage(err)); }
+    finally { setAnnotationBusy(false); }
+  };
+
+  const answerGate = async (answer: string | Record<string, unknown>) => {
+    setGateBusy(true); setGateError("");
+    try { await api.answerGate(runId, answer); setFeedback(""); }
+    catch (err) { setGateError(errorMessage(err)); }
+    finally { setGateBusy(false); }
+  };
+
+  const submitTriage = async (reviewer: string) => {
+    const entries = triagePapers.map((paper) =>
+      triageEntries[paper.id] ?? { paper_id: paper.id, decision: "include" as const, reason: "", note: "" });
+    await answerGate({
+      reviewer,
+      included_paper_ids: entries.filter((e) => e.decision === "include").map((e) => e.paper_id),
+      exclusions: entries.filter((e) => e.decision === "exclude")
+        .map((e) => ({ paper_id: e.paper_id, reason: e.reason })),
+      notes: entries.filter((e) => e.note.trim())
+        .map((e) => ({ paper_id: e.paper_id, note: e.note.trim() })),
+    });
+  };
+
+  const archive = async () => {
+    if (!record) return;
+    try { await api.setRunArchived(runId, !record.archived_at); await refresh(); notify(record.archived_at ? "Run restored." : "Run archived.", "success"); }
+    catch (err) { notify(errorMessage(err)); }
+  };
+  const retry = async () => {
+    try { await api.retryRun(runId); await refresh(); notify("Run resumed from its checkpoint.", "success"); }
+    catch (err) { notify(errorMessage(err)); }
+  };
+
+  const selectedRevision = analysisRevisions.find((item) => item.id === selectedRevisionId);
+  const isCurrentRevision = !selectedRevisionId || selectedRevisionId === currentRevisionId || selectedRevision?.current;
+  const benchmark = selectedResult?.model_name.startsWith("ChillerCooled");
+  const tempKey = benchmark ? "T_room_K" : "T";
+  const powerKey = benchmark ? (showRawPower ? "P_HVAC_W" : "P_HVAC_screened_W") : "P_cool";
+  const tabCounts = { literature: state.paper_cards?.length ?? 0, intelligence: (state.research_synthesis?.gaps.length ?? state.gaps?.length ?? 0) + (state.research_synthesis?.conflicts.length ?? 0), experiment: state.experiment_plan?.cases.length ?? (state.experiment_spec ? 1 : 0), results: results?.cases.length ?? 0, claims: state.claim_bundle?.claims.length ?? 0 };
+
+  if (!record) return recordError
+    ? <Alert tone="danger" title="Run unavailable"><p>{recordError}</p><Button onClick={goDashboard}>Return to all runs</Button></Alert>
+    : <LoadingBlock label="Connecting to the run…" />;
+  const gate = record.status === "waiting_gate" ? record.gate : null;
+  const readerPaperId = params.get("pdf") ?? "";
+  const readerPage = Math.max(1, Number(params.get("page") || 1));
+  const readerView = params.get("pdfview") === "text" ? "text" : "page";
+  const readerDim = params.get("pdfdim") === "1";
+  const readerPaper = (state.paper_cards ?? []).find((paper) => paper.id === readerPaperId) ?? null;
+  const closeReader = () => updateParams({ pdf: null, page: null, pdfview: null, pdfdim: null });
+
+  return <section>
+    <Button variant="ghost" onClick={goDashboard}>← All runs</Button>
+    <LineageBreadcrumb runId={runId} openRun={openRun} />
+    <div className="run-header">
+      <div><div className="run-title-row"><h1>{record.topic}</h1><span className={`status-pill status-${record.status}`}>{record.status.replace("_", " ")}</span>{record.archived_at && <span className="status-pill status-stale">archived</span>}</div><div className="run-meta mono"><span>{record.run_id}</span><span>{fmtElapsed(record)}</span><span>{record.auto ? "automatic gates" : "human approval"}</span>{record.retry_count ? <span>retry {record.retry_count}</span> : null}</div></div>
+      <div className="run-actions">{record.status === "failed" && record.retryable && <Button variant="primary" onClick={() => void retry()}>Retry checkpoint</Button>}{["done", "failed", "stale"].includes(record.status) && <Button onClick={() => void archive()}>{record.archived_at ? "Restore" : "Archive"}</Button>}<a className="btn" href={api.artifactExportUrl(runId)}>Download artifacts</a></div>
     </div>
-  );
+    {record.error && <Alert tone="danger" title="Run failed"><div>{record.error}</div>{record.retryable ? <p>This failure has a resumable checkpoint.</p> : <p>This failure cannot be safely retried in place.</p>}</Alert>}
+    {record.checkpoint_health && ["missing", "incompatible", "corrupt"].includes(record.checkpoint_health.status) && <Alert tone={record.checkpoint_health.status === "missing" && ["done", "stale"].includes(record.status) ? "warning" : "danger"} title={record.checkpoint_health.status === "missing" ? "Legacy artifacts only" : "Checkpoint unavailable"}><p>{record.checkpoint_health.detail}</p>{record.checkpoint_health.status === "missing" && ["done", "stale"].includes(record.status) && <p>The preserved report and artifacts remain readable, but this cycle cannot resume from workflow state.</p>}</Alert>}
+
+    <div className="card workflow-card"><WorkflowPhases current={record.current_node} history={record.node_history} status={record.status} entryPoint={record.entry_point} /></div>
+
+    {gate && <section className="card gate-panel" aria-labelledby="gate-heading"><div className="gate-heading"><span className="evidence-kind">Action required</span><h2 id="gate-heading">{gate.question}</h2></div>
+      {gate.gate === "literature_triage" && <div className={readerPaper ? "reader-layout" : undefined}><LiteratureTriage papers={triagePapers} entries={triageEntries} busy={gateBusy} readingPaperId={readerPaperId} onEntryChange={(id, changes) => setTriageEntries((current) => ({ ...current, [id]: { ...(current[id] ?? { paper_id: id, decision: "include", reason: "", note: "" }), ...changes } }))} onOpenPdf={(id) => id === readerPaperId ? closeReader() : updateParams({ pdf: id, page: "1", evidence: null })} onSubmit={(reviewer) => void submitTriage(reviewer)} />{readerPaper && <PdfReaderPane paper={readerPaper} page={readerPage} view={readerView} dim={readerDim} onParams={updateParams} onClose={closeReader} />}</div>}
+      {gate.gate === "hypothesis_selection" && <HypothesisRanking hypotheses={state.hypotheses ?? []} busy={gateBusy} onEvidence={(id) => updateParams({ evidence: id })} onSelect={(id) => void answerGate({ selected_id: id })} />}
+      {gate.gate === "spec_approval" && <div className="gate-approval"><div><h3>Approve {gate.plan?.cases.length ?? 1} executable case{gate.plan?.cases.length === 1 ? "" : "s"}</h3><p>{gate.plan?.description || gate.spec?.description}</p><dl><dt>Model</dt><dd className="mono">{gate.spec?.model_name}</dd><dt>Cases</dt><dd>{gate.plan?.cases.length ?? 1}</dd><dt>Matched pairs</dt><dd>{gate.plan?.comparison_pairs.length ?? 0}</dd><dt>Protocol</dt><dd className="mono">{gate.plan?.analysis_protocol?.id ?? "generic"}</dd></dl><Button variant="primary" disabled={gateBusy || Boolean(gate.plan?.validation_issues.length)} onClick={() => void answerGate({ decision: "approve" })}>{gateBusy ? "Submitting…" : "Approve and execute"}</Button></div><div><label className="field-label" htmlFor="gate-feedback">Request a revision</label><textarea id="gate-feedback" className="field" rows={6} value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="Describe the scientific or execution change required." /><Button disabled={gateBusy || !feedback.trim()} onClick={() => void answerGate({ decision: "revise", feedback: feedback.trim() })}>Return for revision</Button></div></div>}
+      {gate.gate === "rollback_decision" && <div className="toolbar"><Button variant="primary" disabled={gateBusy} onClick={() => void answerGate({ decision: "revise", feedback: "Revise failed experiment cases" })}>Revise plan</Button><Button disabled={gateBusy} onClick={() => void answerGate({ decision: "continue_partial" })}>Continue with qualified partial evidence</Button><Button variant="danger" disabled={gateBusy} onClick={() => void answerGate({ decision: "abort" })}>Abort</Button></div>}
+      {!["literature_triage", "hypothesis_selection", "spec_approval", "rollback_decision"].includes(gate.gate) && <div className="gate-fallback"><Alert tone="warning" title="This gate has no dedicated form yet"><p>Answer it directly so the run is never left unresumable.</p></Alert><label><span className="field-label">Raw gate answer</span><textarea id="gate-raw" className="field mono" rows={4} value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="A plain answer, or JSON for a structured decision." /></label><Button variant="primary" disabled={gateBusy || !feedback.trim()} onClick={() => { let parsed: string | Record<string, unknown> = feedback.trim(); try { parsed = JSON.parse(feedback) as Record<string, unknown>; } catch { /* plain text answer */ } void answerGate(parsed); }}>Submit answer</Button></div>}
+      {gateError && <Alert tone="danger">{gateError}</Alert>}
+    </section>}
+
+    <ResearchReviewPanel record={record} protocol={state.experiment_plan?.analysis_protocol} refresh={refresh} openRun={openRun} />
+    {record.status === "done" && <EvaluationRubric runId={runId} />}
+
+    <nav className="run-tabs" aria-label="Run workspace">{TABS.map((item) => <button key={item.key} aria-current={tab === item.key ? "page" : undefined} onClick={() => updateParams({ tab: item.key })}>{item.label}{item.key in tabCounts && <span>{tabCounts[item.key as keyof typeof tabCounts]}</span>}</button>)}</nav>
+
+    {tab === "overview" && <div className="overview-workspace">
+      {record.outcome ? <RunOutcome outcome={record.outcome} claims={state.claim_bundle?.claims.length ?? 0} /> : <LoadingBlock label="Preparing the decision summary…" />}
+      <div className="overview-grid"><section className="card overview-main"><h2>Research question</h2><p className="lead">{state.selected_hypothesis?.statement ?? record.thesis_idea?.research_question ?? "The research question will appear after hypothesis selection."}</p>{state.review_bundle && <Alert tone={state.review_bundle.valid ? "info" : "danger"} title={state.review_bundle.valid ? "Evidence review passed" : "Evidence review failed"}>{state.review_bundle.issues.length ? state.review_bundle.issues.map((issue) => issue.message).join(" ") : "All structured claim links were accepted."}</Alert>}</section><aside className="card overview-side"><h2>Evidence inventory</h2><dl><dt>Literature cards</dt><dd>{state.paper_cards?.length ?? 0}</dd><dt>Hypotheses</dt><dd>{state.hypotheses?.length ?? 0}</dd><dt>Experiment cases</dt><dd>{results?.cases.length ?? 0}</dd><dt>Comparisons</dt><dd>{results?.comparisons.length ?? 0}</dd><dt>Claims</dt><dd>{state.claim_bundle?.claims.length ?? 0}</dd></dl></aside></div>
+    </div>}
+
+    {tab === "literature" && (state.paper_cards?.length ? <div className="paper-grid">{state.paper_cards.map((paper) => <article className="card paper-card" key={paper.id}><div className="toolbar"><CredibilityBadge status={paper.peer_review_confidence} /><span className="mono score">{paper.selection_score.toFixed(1)}</span></div><button className="paper-title" onClick={() => updateParams({ evidence: `paper:${paper.id}` })}>{paper.title}</button><p>{paper.problem || "Problem statement unavailable."}</p><small>{paper.year ?? "n.d."} · {paper.venue ?? "unknown venue"} · extraction from {paper.extraction_basis} · {paper.findings?.length ?? 0} findings</small>{paper.findings?.length ? <details><summary>Extracted findings</summary><ul>{paper.findings.map((finding) => <li key={finding.id}><button className="evidence-table-link" onClick={() => updateParams({ evidence: finding.id })}>{finding.statement}</button></li>)}</ul></details> : null}<div className="tag-row">{paper.tags.map((tag) => <span key={tag}>{tag}</span>)}</div></article>)}</div> : <EmptyState>Literature cards will appear after research-memory construction.</EmptyState>)}
+
+    {tab === "intelligence" && <ResearchIntelligence synthesis={state.research_synthesis} legacyGaps={state.gaps ?? []} hypotheses={state.hypotheses ?? []} selectedId={state.selected_hypothesis?.id} onEvidence={(id) => updateParams({ evidence: id })} />}
+
+    {tab === "experiment" && (state.experiment_plan ? <div className="experiment-layout"><section className="card"><div className="section-heading"><h2>Approved case matrix</h2><span className="mono">{state.experiment_plan.cases.length} cases</span></div><div className="case-grid">{state.experiment_plan.cases.map((item) => { const result = results?.cases.find((row) => row.case_id === item.id); return <button key={item.id} onClick={() => updateParams({ tab: "results", case: item.id, evidence: null })}><span className="mono">{item.id}</span><b>{item.label}</b><small>{item.model_name}</small><span className={`status-pill status-${result?.status === "ok" ? "done" : result?.status ?? "stale"}`}>{result?.status ?? "planned"}</span></button>; })}</div></section><aside className="card protocol-card"><h2>Frozen protocol</h2><button className="protocol-link" onClick={() => updateParams({ evidence: `protocol:${state.experiment_plan?.analysis_protocol?.id}` })}>{state.experiment_plan.analysis_protocol?.id}</button><dl><dt>Threshold</dt><dd>{state.experiment_plan.analysis_protocol?.thermal_threshold_degC} °C</dd><dt>HVAC screen</dt><dd>{state.experiment_plan.analysis_protocol?.hvac_power_screen_min_W}–{state.experiment_plan.analysis_protocol?.hvac_power_screen_max_W} W</dd><dt>Primary metrics</dt><dd>{state.experiment_plan.primary_metrics.length}</dd></dl><div className="mono hash-wrap">{results?.experiment_plan_sha256}</div></aside></div> : <EmptyState>The experiment plan will appear after specification compilation.</EmptyState>)}
+
+    {tab === "results" && (results && selectedResult ? <div className="results-workspace">
+      <div className="card results-toolbar"><label><span>Analysis revision</span><select className="field" value={selectedRevisionId} onChange={(event) => updateParams({ revision: event.target.value, case: null, evidence: null })}>{analysisRevisions.map((revision) => <option key={revision.id} value={revision.id}>{revision.current ? "Current" : "Archived"} · {revision.protocol_id || "legacy"} · {revision.id.slice(0, 10)}</option>)}</select></label><label><span>Displayed case</span><select className="field" value={selectedResult.case_id || selectedResult.spec_id} onChange={(event) => updateParams({ case: event.target.value, evidence: null })}>{successfulCases.map((item) => <option key={item.case_id || item.spec_id} value={item.case_id || item.spec_id}>{item.case_id || item.spec_id} · {item.model_name}</option>)}</select></label><div className="revision-state"><span className={`status-pill ${isCurrentRevision ? "status-done" : "status-stale"}`}>{isCurrentRevision ? "current analysis" : "archived read-only"}</span><span className="mono">{results.analysis_revision_id?.slice(0, 12)}</span></div></div>
+      {results.warnings.length > 0 && <Alert tone="warning" title="Qualified result">{results.warnings.join(" ")}</Alert>}
+      {results.quality_report && <section className={`card quality-panel ${results.quality_report.valid ? "valid" : "invalid"}`}><div className="section-heading"><h2>{results.quality_report.valid ? "Study quality accepted" : "Study quality failed"}</h2><span className="mono">{results.quality_report.protocol_sha256.slice(0, 12)}</span></div><div className="quality-grid">{results.quality_report.checks.map((check) => <button key={check.id} onClick={() => updateParams({ evidence: `quality:${check.id}` })}><span className={`check-state ${check.status}`}>{check.status}</span><b>{check.id.replaceAll("-", " ")}</b><small>{check.message}</small></button>)}</div></section>}
+      <section><div className="section-heading"><h2>Matched comparisons</h2><span>{results.comparisons.length} evidence records</span></div><ComparisonTable comparisons={results.comparisons} onEvidence={(id) => updateParams({ evidence: id })} /></section>
+      {state.experiment_plan && <ComparisonVisuals runId={runId} revisionId={selectedRevisionId || undefined} plan={state.experiment_plan} results={results} />}
+      <div className="case-evidence-bar card"><Button onClick={() => updateParams({ evidence: `case:${selectedResult.case_id || selectedResult.spec_id}` })}>Inspect case provenance</Button><span className={`integrity ${selectedResult.result_file_integrity}`}>{selectedResult.result_file_integrity ?? "unverified"}</span><span className="mono hash-wrap">raw {selectedResult.result_file_sha256?.slice(0, 16) || "unavailable"}</span><span className="mono hash-wrap">dataset {results.raw_dataset_sha256?.slice(0, 16)}</span></div>
+      <div className="metric-grid">{Object.entries(selectedResult.metrics).map(([key, value]) => { const display = METRIC_DISPLAY[key] ?? { label: key, unit: "", color: "var(--text)" }; return <button className="card metric-card" key={key} onClick={() => updateParams({ evidence: `metric:${key}` })}><span className="mono">{key}</span><strong style={{ color: display.color }}>{fmtMetric(key, value)} <small>{display.unit}</small></strong><small>{display.label}</small></button>; })}</div>
+      {seriesError && <Alert tone="danger" title="Series unavailable">{seriesError}</Alert>}
+      <div className="chart-grid"><ScientificChart title="Room temperature" unit={benchmark ? "K" : "°C"} series={series} lines={[{ key: tempKey, label: benchmark ? "Room temperature" : "Temperature", color: "#dc4c4c" }]} /><div><div className="chart-toggle">{benchmark && series?.P_HVAC_screened_W && <Button onClick={() => setShowRawPower(!showRawPower)}>{showRawPower ? "Use approved screened power" : "Inspect raw upstream power"}</Button>}</div><ScientificChart title={showRawPower && benchmark ? "Raw HVAC power · diagnostic" : "Cooling power"} unit="W" series={series} lines={[{ key: powerKey, label: showRawPower && benchmark ? "Raw HVAC" : "Approved power", color: showRawPower ? "#c77b17" : "#087f95" }]} /></div></div>
+    </div> : <EmptyState>Results will appear after a successful simulation.</EmptyState>)}
+
+    {tab === "claims" && (state.claim_bundle?.claims.length ? <div className="claim-list">{state.claim_bundle.claims.map((claim, index) => <article className="card claim-card" key={`${claim.statement}-${index}`}><div><ConfidenceBadge level={claim.confidence} /><span className="mono">claim {index + 1}</span></div><h2>{claim.statement}</h2><p>{claim.evidence}</p><div className="evidence-chip-row">{claim.comparison_ids.map((id) => <button key={id} onClick={() => updateParams({ evidence: id })}>{id}</button>)}{claim.case_ids.map((id) => <button key={id} onClick={() => updateParams({ evidence: `case:${id}` })}>case:{id}</button>)}{claim.paper_ids.map((id) => <button key={id} onClick={() => updateParams({ evidence: `paper:${id}` })}>paper:{id}</button>)}</div></article>)}</div> : <EmptyState>Supported claims will appear after deterministic evidence review.</EmptyState>)}
+
+    {tab === "report" && (state.report_path ? <ReportWorkspace runId={runId} warnings={state.claim_bundle?.credibility_warnings ?? []} onEvidenceSelect={(id) => updateParams({ evidence: id })} /> : <EmptyState>The structured report will appear after evidence review.</EmptyState>)}
+
+    <EvidenceInspector evidenceId={evidenceId} results={results} plan={state.experiment_plan ?? null} papers={state.paper_cards ?? []} claims={state.claim_bundle ?? null} synthesis={state.research_synthesis ?? null} onNavigate={(id) => updateParams({ evidence: id })} onSelectCase={(caseId) => updateParams({ tab: "results", case: caseId, evidence: null })} onClose={() => updateParams({ evidence: null })} annotations={annotations} onAnnotate={saveAnnotation} onResolveAnnotation={(id) => void resolveAnnotationById(id)} onOpenPdf={(paperId, page) => updateParams({ pdf: paperId, page: String(page ?? 1), evidence: null })} annotationBusy={annotationBusy} />
+  </section>;
 }
