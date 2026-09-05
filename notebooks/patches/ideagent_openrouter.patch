@@ -1,0 +1,97 @@
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/IDEAgent/ideagent/clients.py vendor/IDEAgent/ideagent/clients.py
+--- a/ideagent/clients.py	2026-09-05 16:01:09.882840306 +0800
++++ b/ideagent/clients.py	2026-09-05 16:37:16.088658075 +0800
+@@ -429,6 +429,7 @@
+         model_id: str,
+         api_key_env: str = "OPENAI_API_KEY",
+         timeout: float = 120.0,
++        base_url: str | None = None,
+     ) -> None:
+         try:
+             from openai import OpenAI
+@@ -450,8 +451,10 @@
+                 "or add it to a .env file."
+             )
+         self.model_id = model_id
+-        # No base_url override -- the OpenAI SDK's own default is https://api.openai.com/v1.
+-        self.client = OpenAI(api_key=api_key, timeout=timeout)
++        # base_url lets this client talk to any OpenAI-compatible endpoint (e.g. OpenRouter);
++        # None keeps the SDK default https://api.openai.com/v1.
++        self.base_url = base_url
++        self.client = OpenAI(api_key=api_key, timeout=timeout, base_url=base_url)
+         self._init_response_metadata()
+ 
+     def _chat_request(self, messages: list[dict[str, str]], kwargs: dict[str, Any]) -> dict[str, Any]:
+@@ -466,7 +469,15 @@
+             "messages": messages,
+             "max_completion_tokens": int(kwargs.get("max_new_tokens", 8192)),
+         }
+-        if kwargs.get("enable_thinking"):
++        if self.base_url is not None:
++            # OpenAI-compatible gateways (OpenRouter): control hidden reasoning explicitly. On
++            # reasoning models the hidden tokens count against max_completion_tokens, so leaving
++            # reasoning on by default truncates long outputs before any visible text appears.
++            if kwargs.get("enable_thinking"):
++                request["extra_body"] = {"reasoning": {"effort": kwargs.get("thinking_effort") or "medium"}}
++            else:
++                request["extra_body"] = {"reasoning": {"enabled": False}}
++        elif kwargs.get("enable_thinking"):
+             thinking_effort = kwargs.get("thinking_effort")
+             if thinking_effort:
+                 request["reasoning_effort"] = thinking_effort
+@@ -501,11 +512,20 @@
+         if int(n) <= 0:
+             raise ValueError("n must be a positive integer")
+         request = self._chat_request(messages, kwargs)
+-        if int(n) != 1:
++        if int(n) != 1 and self.base_url is None:
+             request["n"] = int(n)
+         completion = self.client.chat.completions.create(**request)
+         self._set_response_metadata(_completion_metadata(completion))
+         outputs = [self._choice_content(choice) for choice in completion.choices]
++        if len(outputs) < int(n) and self.base_url is not None:
++            # Many OpenAI-compatible gateways (OpenRouter included) ignore n and return one
++            # choice; fan the remaining samples out as independent requests instead.
++            def _one() -> str:
++                c = self.client.chat.completions.create(**request)
++                return self._choice_content(c.choices[0])
++
++            with ThreadPoolExecutor(max_workers=max(1, int(n) - len(outputs))) as executor:
++                outputs += list(executor.map(lambda _: _one(), range(int(n) - len(outputs))))
+         if len(outputs) < int(n):
+             raise ValueError(f"OpenAI returned {len(outputs)} choices for n={int(n)}")
+         return outputs
+@@ -664,7 +684,14 @@
+     vllm_port: int = 8000,
+     api_key_env: str = "VLLM_API_KEY",
+     request_timeout: float = 120.0,
++    base_url: str | None = None,
+ ) -> LLMClient:
++    if base_url:
++        # Explicit OpenAI-compatible endpoint (OpenRouter, LiteLLM, ...): route every model id
++        # there regardless of its vendor prefix.
++        return OpenAIClient(
++            model_id=model_id, api_key_env=api_key_env, timeout=request_timeout, base_url=base_url
++        )
+     if model_id and model_id.lower().startswith(("gemini", "gemma")):
+         return GeminiClient(model_id=model_id, api_key_env=api_key_env, timeout=request_timeout)
+     if model_id and model_id.lower().startswith("gpt-"):
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/IDEAgent/scripts/run_ideagent.py vendor/IDEAgent/scripts/run_ideagent.py
+--- a/scripts/run_ideagent.py	2026-09-05 16:01:09.884812482 +0800
++++ b/scripts/run_ideagent.py	2026-09-05 16:22:08.410721398 +0800
+@@ -73,6 +73,7 @@
+         raw_client = build_client(
+             model_id=model_id, vllm_port=int(a.get("port", 8000)),
+             api_key_env=role_api_key_env, request_timeout=timeout,
++            base_url=a.get("base_url", client_cfg.get("base_url")),
+         )
+         clients[role] = TracedClient(raw_client, logger=trace_logger, role=role)
+         gen_kwargs[role] = _sampling(a)
+@@ -107,7 +108,6 @@
+         press_nb_target=int(run.get("press_nb_target", 90)),
+         press_soundness_target=float(run.get("press_soundness_target", 80)),
+         press_clarity_target=int(run.get("press_clarity_target", 80)),
+-        feasibility_prompt_mode=str(run.get("feasibility_prompt_mode", "generic")),
+         press_feasibility_target=int(run.get("press_feasibility_target", 0)),
+         rejected_pending_cap=int(run.get("rejected_pending_cap", 20)),
+         consolidate_every=int(run.get("consolidate_every", 12)),

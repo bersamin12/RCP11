@@ -7,3 +7,7 @@ dist/
 *.egg-info/
 .pytest_cache/
 vendor/
+
+# paper test notebooks
+notebooks/outputs/
+notebooks/.ipynb_checkpoints/

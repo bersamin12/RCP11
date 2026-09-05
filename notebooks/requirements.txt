@@ -1,0 +1,31 @@
+# Extra dependencies for the paper test notebooks. Install into the project venv:
+#   uv pip install -r notebooks/requirements.txt
+#   python -m ipykernel install --user --name rcp --display-name "Python (rcp)"
+# Notebook tooling
+jupyterlab>=4.2
+ipykernel>=6.29
+nbformat>=5.10
+nbconvert>=7.16
+ipywidgets>=8.1
+# Analysis / plotting
+numpy>=1.26
+pandas>=2.2
+matplotlib>=3.9
+scipy>=1.13
+scikit-learn>=1.5
+# LLM access (OpenRouter is OpenAI-compatible) + IDEAgent runtime deps
+openai>=1.50
+python-dotenv>=1.0
+backoff>=2.2
+PyYAML>=6.0
+google-genai>=1.0
+anthropic>=0.40
+rich>=13.0
+tqdm>=4.66
+# KTPO tiny GRPO run (GPU)
+torch>=2.6
+transformers>=4.50
+trl>=0.20
+peft>=0.15
+accelerate>=1.5
+datasets>=3.0
