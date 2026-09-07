@@ -84,7 +84,8 @@ def evaluate(src: str, timeout_s: int = TIMEOUT_S) -> Result:
         except Exception as exc:  # program crashed / timed out / returned garbage
             msg = str(exc)
             m = re.search(r"Program execution failed: (.*)", msg)
-            err = (m.group(1) if m else msg).strip().splitlines()[-1][:300]
+            lines = (m.group(1) if m else msg).strip().splitlines()
+            err = (lines[-1] if lines else f"{type(exc).__name__} with no message (crash or timeout)")[:300]
             return Result(0.0, False, f"error={err}", error=err)
         centers = np.asarray(centers, dtype=float)
         radii = np.asarray(radii, dtype=float)

@@ -1,0 +1,158 @@
+--- a/_mgsm/search.py	2026-09-06 01:15:01.139594905 +0800
++++ b/_mgsm/search.py	2026-09-06 01:59:49.877099916 +0800
+@@ -3,6 +3,7 @@
+ import json
+ import os
+ import random
++import time
+ from collections import namedtuple
+ from concurrent.futures import ThreadPoolExecutor
+ 
+@@ -13,7 +14,47 @@
+ 
+ from mgsm_prompt import get_init_archive, get_prompt, get_reflexion_prompt
+ 
+-client = openai.OpenAI()
++# --- RCP: talk to any OpenAI-compatible endpoint (OpenRouter) instead of api.openai.com,
++# and route every hard-coded gpt-3.5/gpt-4 model id to the project model (RCP_MODEL).
++RCP_BASE_URL = os.environ.get("RCP_BASE_URL", "https://openrouter.ai/api/v1")
++RCP_MODEL = os.environ.get("RCP_MODEL", "gpt-3.5-turbo-0125")
++RCP_REASONING = os.environ.get("NB_REASONING", "off")
++# The repo's own value; overridable because OpenRouter reserves credit for the *whole* completion
++# budget of every in-flight request and refuses the call with HTTP 402 when the balance is low.
++RCP_MAX_TOKENS = int(os.environ.get("NB_MAX_TOKENS", "4096"))
++
++client = openai.OpenAI(
++    api_key=os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY"),
++    base_url=RCP_BASE_URL,
++    timeout=300,
++    max_retries=2,
++)
++
++# Set by the notebook to record tokens/cost of every call made by the meta agent and by the
++# agents inside forward(); left as None the repo behaves exactly as published.
++USAGE_HOOK = None
++
++
++def _resolve_model(model):
++    """Every model name used by this repo is an OpenAI id; send them all to RCP_MODEL."""
++    return RCP_MODEL
++
++
++def _extra_body():
++    # Hidden reasoning tokens count against max_tokens on reasoning models, which truncates the
++    # meta agent's code before it is emitted; "off" disables them.
++    return {"reasoning": {"enabled": False}} if RCP_REASONING == "off" else {"reasoning": {"effort": RCP_REASONING}}
++
++
++def _retryable(exc):
++    """Retry the transient statuses; 402 here means "in-flight credit budget", not "no credits"."""
++    return getattr(exc, "status_code", None) not in (402, 408, 409, 429, 500, 502, 503, 504)
++
++
++def _track(response, tag, seconds):
++    if USAGE_HOOK is not None:
++        USAGE_HOOK(response, tag, seconds)
++
+ 
+ from utils import get_all_examples, random_id, bootstrap_confidence_interval, score_mgsm
+ 
+@@ -27,21 +68,24 @@
+ SEARCHING_MODE = True
+ 
+ 
+-@backoff.on_exception(backoff.expo, openai.RateLimitError)
++@backoff.on_exception(backoff.expo, openai.APIStatusError, max_tries=5, giveup=_retryable)
+ def get_json_response_from_gpt(
+         msg,
+         model,
+         system_message,
+         temperature=0.5
+ ):
++    t0 = time.time()
+     response = client.chat.completions.create(
+-        model=model,
++        model=_resolve_model(model),
+         messages=[
+             {"role": "system", "content": system_message},
+             {"role": "user", "content": msg},
+         ],
+-        temperature=temperature, max_tokens=4096, stop=None, response_format={"type": "json_object"}
++        temperature=temperature, max_tokens=RCP_MAX_TOKENS, stop=None, response_format={"type": "json_object"},
++        extra_body=_extra_body()
+     )
++    _track(response, "agent", time.time() - t0)
+     content = response.choices[0].message.content
+     json_dict = json.loads(content)
+     # cost = response.usage.completion_tokens / 1000000 * 15 + response.usage.prompt_tokens / 1000000 * 5
+@@ -49,17 +93,20 @@
+     return json_dict
+ 
+ 
+-@backoff.on_exception(backoff.expo, openai.RateLimitError)
++@backoff.on_exception(backoff.expo, openai.APIStatusError, max_tries=5, giveup=_retryable)
+ def get_json_response_from_gpt_reflect(
+         msg_list,
+         model,
+         temperature=0.8
+ ):
++    t0 = time.time()
+     response = client.chat.completions.create(
+-        model=model,
++        model=_resolve_model(model),
+         messages=msg_list,
+-        temperature=temperature, max_tokens=4096, stop=None, response_format={"type": "json_object"}
++        temperature=temperature, max_tokens=RCP_MAX_TOKENS, stop=None, response_format={"type": "json_object"},
++        extra_body=_extra_body()
+     )
++    _track(response, "meta", time.time() - t0)
+     content = response.choices[0].message.content
+     json_dict = json.loads(content)
+     assert not json_dict is None
+@@ -72,7 +119,7 @@
+     """
+ 
+     def __init__(self, output_fields: list, agent_name: str,
+-                 role='helpful assistant', model='gpt-3.5-turbo-0125', temperature=0.5) -> None:
++                 role='helpful assistant', model=None, temperature=0.5) -> None:
+         self.output_fields = output_fields
+         self.agent_name = agent_name
+ 
+@@ -345,10 +392,7 @@
+     parser.add_argument('--expr_name', type=str, default="mgsm_gpt3.5_results")
+     parser.add_argument('--n_generation', type=int, default=30)
+     parser.add_argument('--debug_max', type=int, default=3)
+-    parser.add_argument('--model',
+-                        type=str,
+-                        default='gpt-4o-2024-05-13',
+-                        choices=['gpt-4-turbo-2024-04-09', 'gpt-3.5-turbo-0125', 'gpt-4o-2024-05-13'])
++    parser.add_argument('--model', type=str, default=RCP_MODEL)
+ 
+     args = parser.parse_args()
+     # search
+--- a/_mgsm/utils.py	2026-09-06 01:15:01.139594905 +0800
++++ b/_mgsm/utils.py	2026-09-06 01:52:57.905532656 +0800
+@@ -1,3 +1,4 @@
++import os
+ import random
+ import string
+ from collections import namedtuple
+@@ -42,12 +43,17 @@
+ {input}"""
+ }
+ 
+-LANG_TO_FPATH = lambda lang: f"dataset/mgsm/mgsm_{lang}.tsv"
++# Resolve the shipped MGSM files relative to the repository root rather than the caller's cwd.
++_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
++LANG_TO_FPATH = lambda lang: os.path.join(_REPO_ROOT, f"dataset/mgsm/mgsm_{lang}.tsv")
+ 
+ ALL_LANGUAGES = ["bn", "de", "en", "es", "fr", "ja", "ru", "sw", "te", "th", "zh"]
+ 
+ 
+ def score_mgsm(target: str, prediction: str) -> bool:
++    # Models reached through an OpenAI-compatible gateway often return the requested integer as
++    # a JSON *number*; the repo assumes a string, so normalise before the comparison below.
++    target, prediction = str(target), str(prediction)
+     if "." in prediction:
+         prediction = prediction.rstrip("0").rstrip(".")
+ 

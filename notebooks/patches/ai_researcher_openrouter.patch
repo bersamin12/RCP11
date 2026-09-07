@@ -1,0 +1,534 @@
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/AI-Researcher/ai_researcher/src/analyze_ideas_semantic_similarity.py vendor/AI-Researcher/ai_researcher/src/analyze_ideas_semantic_similarity.py
+--- a/ai_researcher/src/analyze_ideas_semantic_similarity.py	2026-09-06 01:14:57.715782025 +0800
++++ b/ai_researcher/src/analyze_ideas_semantic_similarity.py	2026-09-06 01:34:26.216537449 +0800
+@@ -1,5 +1,8 @@
+-import nltk
+-from nltk.corpus import stopwords
++try:  # RCP notebook patch: nltk is only used by the unused process_text() helper
++    import nltk
++    from nltk.corpus import stopwords
++except ImportError:  # pragma: no cover
++    nltk = stopwords = None
+ import string
+ import json 
+ from tqdm import tqdm 
+@@ -9,7 +12,13 @@
+ import pandas as pd
+ import argparse
+ import os
+-from sentence_transformers import SentenceTransformer
++import sys
++try:  # RCP notebook patch: sentence-transformers pulls in torch, which this notebook must not use
++    from sentence_transformers import SentenceTransformer
++except ImportError:  # pragma: no cover
++    SentenceTransformer = None
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from utils import rcp_similarity_matrix
+ 
+ def plot_string_occurrences(strings_list):
+     # Count occurrences of each string
+@@ -111,16 +120,14 @@
+     print ("#ideas: ", len(all_ideas))
+ 
+     all_ideas = all_ideas[:args.num_ideas]
+-    model = SentenceTransformer("all-MiniLM-L6-v2")
+ 
+     if args.load_similarity_matrix:
+         similarity_matrix = np.load(os.path.join(args.cache_dir, args.cache_name + "_similarity_matrix.npy"))
+     elif args.save_similarity_matrix:
+-        embeddings = model.encode(all_ideas)
+-        similarity_matrix = model.similarity(embeddings, embeddings)
+-        similarity_matrix = similarity_matrix.numpy()
+-        ## setting the diagonal to 0
+-        np.fill_diagonal(similarity_matrix, 0)
++        ## RCP notebook patch: all-MiniLM-L6-v2 needs torch; use the OpenAI-compatible
++        ## /embeddings endpoint (TF-IDF fallback). Diagonal is zeroed as in the original.
++        similarity_matrix, backend = rcp_similarity_matrix(all_ideas)
++        print ("embedding backend: ", backend)
+ 
+         np.save(os.path.join(args.cache_dir, args.cache_name + "_similarity_matrix.npy"), similarity_matrix)
+ 
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/AI-Researcher/ai_researcher/src/dedup_ideas.py vendor/AI-Researcher/ai_researcher/src/dedup_ideas.py
+--- a/ai_researcher/src/dedup_ideas.py	2026-09-06 01:14:57.715782025 +0800
++++ b/ai_researcher/src/dedup_ideas.py	2026-09-06 01:34:26.215952135 +0800
+@@ -1,5 +1,8 @@
+-import nltk
+-from nltk.corpus import stopwords
++try:  # RCP notebook patch: nltk is only used by the unused process_text() helper
++    import nltk
++    from nltk.corpus import stopwords
++except ImportError:  # pragma: no cover
++    nltk = stopwords = None
+ import string
+ import json 
+ from tqdm import tqdm 
+@@ -8,7 +11,13 @@
+ import pandas as pd
+ import argparse
+ import os
+-from sentence_transformers import SentenceTransformer
++import sys
++try:  # RCP notebook patch: sentence-transformers pulls in torch, which this notebook must not use
++    from sentence_transformers import SentenceTransformer
++except ImportError:  # pragma: no cover
++    SentenceTransformer = None
++sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
++from utils import rcp_similarity_matrix
+ 
+ def plot_string_occurrences(strings_list):
+     # Count occurrences of each string
+@@ -88,6 +97,48 @@
+     return output
+ 
+ 
++def dedup_ideas(all_ideas, all_idea_ks, all_idea_vs, similarity_matrix, similarity_threshold=0.8):
++    """Greedy first-wins deduplication (the repo's exact loop, lifted out of __main__).
++
++    Walk the ideas in order; keep an idea if it has not already been filtered, then mark every
++    later idea that is above the cosine threshold (or shares its name) as a duplicate.
++    Returns (final_ideas, filter_idx).
++
++    NOTE: the `and`/`or` precedence in the original condition is preserved verbatim -- it reads
++    ``(j not in filter_idx and sim > thr) or (name_j == name_i)``, so a name collision filters
++    idea j even if j was already in filter_idx (harmless: it is appended twice).
++    """
++    final_ideas = {}
++    filter_idx = []   ## ideas that should be filtered
++    for i in tqdm(range(len(all_ideas))):
++        if i not in filter_idx:
++            ## add current idea to filtered_ideas
++            final_ideas[all_idea_ks[i]] = all_idea_vs[i]
++
++            ## filter out similar ideas
++            for j in range(i+1, len(all_ideas)):
++                if j not in filter_idx and similarity_matrix[i][j] > similarity_threshold or all_idea_ks[j] == all_idea_ks[i]:
++                    filter_idx.append(j)
++    return final_ideas, filter_idx
++
++
++def load_ideas(cache_dir, cache_name):
++    """Read a seed-idea cache file -> (topic, concatenated texts, names, raw values)."""
++    all_ideas, all_idea_ks, all_idea_vs = [], [], []
++    with open(os.path.join(cache_dir, cache_name + ".json"), "r") as f:
++        ideas_json = json.load(f)
++    topic = ideas_json["topic_description"]
++    for ideas_dict in ideas_json["ideas"]:
++        for idea_k, idea_v in ideas_dict.items():
++            try:
++                all_ideas.append(concatenate_idea(idea_k, idea_v))
++                all_idea_ks.append(idea_k)
++                all_idea_vs.append(idea_v)
++            except:
++                continue
++    return topic, all_ideas, all_idea_ks, all_idea_vs
++
++
+ if __name__ == "__main__": 
+     parser = argparse.ArgumentParser()
+     parser.add_argument('--cache_dir', type=str, default="bias", help='cache file name')
+@@ -97,46 +148,26 @@
+     parser.add_argument("--num_ideas", type=int, default=1000, help="top n ideas to consider")
+     args = parser.parse_args()
+ 
+-    model = SentenceTransformer("all-MiniLM-L6-v2")
+     print ("Similarity Threshold: ", args.similarity_threshold)
+ 
+-    all_ideas = []
+-    all_idea_ks = []
+-    all_idea_vs = []
+-    topic = ""
+-    with open(os.path.join(args.cache_dir, args.cache_name + ".json"), "r") as f:
+-        ideas_json = json.load(f)
+-        topic = ideas_json["topic_description"]
+-        for ideas_dict in ideas_json["ideas"]:
+-            for idea_k, idea_v in ideas_dict.items():
+-                try:
+-                    all_ideas.append(concatenate_idea(idea_k, idea_v))
+-                    all_idea_ks.append(idea_k)
+-                    all_idea_vs.append(idea_v)
+-                except:
+-                    continue
+-    
+-    # all_ideas = all_ideas[:40]
++    topic, all_ideas, all_idea_ks, all_idea_vs = load_ideas(args.cache_dir, args.cache_name)
++
+     print ("#original ideas: ", len(all_ideas))
+     all_ideas = all_ideas[:args.num_ideas]
+ 
+-    similarity_matrix = np.load(os.path.join(args.cache_dir, args.cache_name + "_similarity_matrix.npy"))
++    matrix_file = os.path.join(args.cache_dir, args.cache_name + "_similarity_matrix.npy")
++    if os.path.exists(matrix_file):
++        similarity_matrix = np.load(matrix_file)
++    else:
++        ## RCP notebook patch: compute it here if analyze_ideas_semantic_similarity.py was not run
++        similarity_matrix, backend = rcp_similarity_matrix(all_ideas)
++        print ("computed similarity matrix with backend: ", backend)
+     if len(similarity_matrix) != len(all_ideas):
+         print ("Error: similarity matrix size mismatch")
+         exit(0)
+ 
+-    final_ideas = {}
+-    filter_idx = [] ## ideas that should be filtered
+-    for i in tqdm(range(len(all_ideas))):
+-        if i not in filter_idx:
+-            ## add current idea to filtered_ideas
+-            final_ideas[all_idea_ks[i]] = all_idea_vs[i]
++    final_ideas, filter_idx = dedup_ideas(all_ideas, all_idea_ks, all_idea_vs, similarity_matrix, args.similarity_threshold)
+ 
+-            ## filter out similar ideas
+-            for j in range(i+1, len(all_ideas)):
+-                if j not in filter_idx and similarity_matrix[i][j] > args.similarity_threshold or all_idea_ks[j] == all_idea_ks[i]:
+-                    filter_idx.append(j)
+-    
+     print ("#final ideas: ", len(final_ideas))
+ 
+     final_json = {}
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/AI-Researcher/ai_researcher/src/grounded_idea_gen.py vendor/AI-Researcher/ai_researcher/src/grounded_idea_gen.py
+--- a/ai_researcher/src/grounded_idea_gen.py	2026-09-06 01:14:57.716233486 +0800
++++ b/ai_researcher/src/grounded_idea_gen.py	2026-09-06 01:34:26.215783938 +0800
+@@ -1,6 +1,9 @@
+ from openai import OpenAI
+ import anthropic
+-from together import Together
++try:  # RCP notebook patch: the Together SDK is only needed for the Llama/Qwen engines
++    from together import Together
++except ImportError:  # pragma: no cover
++    Together = None
+ from utils import call_api, shuffle_dict_and_convert_to_string
+ import argparse
+ import json
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/AI-Researcher/ai_researcher/src/lit_review_tools.py vendor/AI-Researcher/ai_researcher/src/lit_review_tools.py
+--- a/ai_researcher/src/lit_review_tools.py	2026-09-06 01:14:57.716233486 +0800
++++ b/ai_researcher/src/lit_review_tools.py	2026-09-06 01:57:11.610448187 +0800
+@@ -1,15 +1,70 @@
+ import requests
+ import re
+ import json
++import os
++import random
++import time
+ 
+ # Define the paper search endpoint URL
+ search_url = 'https://api.semanticscholar.org/graph/v1/paper/search/'
+ graph_url = 'https://api.semanticscholar.org/graph/v1/paper/'
+ rec_url = "https://api.semanticscholar.org/recommendations/v1/papers/forpaper/"
+ 
+-with open("../keys.json", "r") as f:
+-    keys = json.load(f)
+-S2_KEY = keys["s2_key"]
++# --- RCP notebook patch: keys.json is optional -------------------------------------------
++# The original resolves "../keys.json" against the *process* CWD, so importing this module
++# from anywhere but ai_researcher/ crashes. Resolve it against __file__ instead and treat a
++# missing file (or an empty s2_key) as "use the public, unauthenticated Semantic Scholar API".
++_KEYS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir, "keys.json")
++try:
++    with open(_KEYS_PATH, "r") as f:
++        keys = json.load(f)
++except Exception:  # noqa: BLE001
++    keys = {}
++S2_KEY = keys.get("s2_key") or os.environ.get("S2_API_KEY", "")
++
++# --- RCP notebook patch: retries/backoff for the rate-limited public API -------------------
++S2_MAX_RETRIES = int(os.environ.get("S2_MAX_RETRIES", 8))
++S2_MIN_INTERVAL = float(os.environ.get("S2_MIN_INTERVAL", 1.5))    # seconds between requests
++S2_MAX_BACKOFF = float(os.environ.get("S2_MAX_BACKOFF", 30))       # cap on the exponential backoff
++S2_MAX_REFERENCES = int(os.environ.get("S2_MAX_REFERENCES", 100))  # refs to expand in GetReferences
++S2_VERBOSE = os.environ.get("S2_VERBOSE", "1") not in ("", "0")
++_LAST_CALL = [0.0]
++
++
++def s2_get(url, params):
++    """GET with polite pacing and exponential backoff on 429/5xx; returns the JSON or None.
++
++    Without an API key the public endpoint shares one low rate limit across all anonymous
++    callers, so 429s are the normal case rather than the exception and have to be waited out.
++    """
++    headers = {'x-api-key': S2_KEY} if S2_KEY else {}
++    for attempt in range(S2_MAX_RETRIES):
++        wait = S2_MIN_INTERVAL - (time.time() - _LAST_CALL[0])
++        if wait > 0:
++            time.sleep(wait)
++        try:
++            response = requests.get(url, params=params, headers=headers, timeout=60)
++        except requests.RequestException as exc:  # noqa: BLE001
++            print("[S2] request error: %s" % str(exc)[:120])
++            response = None
++        _LAST_CALL[0] = time.time()
++        if response is not None and response.status_code == 200:
++            return response.json()
++        code = response.status_code if response is not None else "conn"
++        if code not in (429, 500, 502, 503, 504, "conn"):
++            return None
++        retry_after = 0.0
++        if response is not None:
++            try:
++                retry_after = float(response.headers.get("Retry-After", 0))
++            except (TypeError, ValueError):
++                retry_after = 0.0
++        backoff = max(retry_after, min(2.0 ** attempt, S2_MAX_BACKOFF)) + random.random()
++        if S2_VERBOSE:
++            print("[S2] status %s, retry %d/%d in %.1fs" % (code, attempt + 1, S2_MAX_RETRIES, backoff))
++        time.sleep(backoff)
++    print("[S2] giving up after %d attempts (%s)" % (S2_MAX_RETRIES, url))
++    return None
+ 
+ def KeywordQuery(keyword):
+     ## retrieve papers based on keywords
+@@ -18,13 +73,7 @@
+         'limit': 20,
+         'fields': 'title,year,citationCount,abstract,tldr'
+     }
+-    headers = {'x-api-key': S2_KEY}
+-    response = requests.get(search_url, params=query_params, headers = headers)
+-    
+-    if response.status_code == 200:
+-        return response.json()
+-    else:
+-        return None
++    return s2_get(search_url, query_params)
+ 
+ def PaperQuery(paper_id):
+     ## retrieve similar papers based on paper id
+@@ -33,24 +82,12 @@
+         'limit': 20,
+         'fields': 'title,year,citationCount,abstract'
+     }
+-    headers = {'x-api-key': S2_KEY}
+-    response = requests.get(url = rec_url + paper_id, params = query_params, headers = headers)
+-    
+-    if response.status_code == 200:
+-        return response.json()
+-    else:
+-        return None
++    return s2_get(rec_url + paper_id, query_params)
+ 
+ def PaperDetails(paper_id, fields='title,year,abstract,authors,citationCount,venue,citations,references,tldr'):
+     ## get paper details based on paper id
+     paper_data_query_params = {'fields': fields}
+-    headers = {'x-api-key': S2_KEY}
+-    response = requests.get(url = graph_url + paper_id, params = paper_data_query_params, headers = headers)
+-
+-    if response.status_code == 200:
+-        return response.json()
+-    else:
+-        return None
++    return s2_get(graph_url + paper_id, paper_data_query_params)
+ 
+ def GetAbstract(paper_id):
+     ## get the abstract of a paper based on paper id
+@@ -82,10 +119,15 @@
+ def GetReferences(paper_id):
+     ## get the reference list of a paper based on paper id
+     paper_details = PaperDetails(paper_id)
+-    references = paper_details["references"][ : 100]
++    if paper_details is None or not paper_details.get("references"):
++        return None
++    ## RCP notebook patch: S2_MAX_REFERENCES caps the fan-out of PaperDetails calls, which
++    ## would otherwise be 100 extra requests against the unauthenticated rate limit.
++    references = paper_details["references"][ : S2_MAX_REFERENCES]
+ 
+     ## get details of each reference, keep first 20 to save costs
+     detailed_references = [PaperDetails(ref["paperId"], fields='title,year,abstract,citationCount') for ref in references if ref["paperId"]]
++    detailed_references = [r for r in detailed_references if r]
+     detailed_references = paper_filter(detailed_references)[ : 20]
+     
+     if paper_details is not None:
+@@ -110,6 +152,8 @@
+         keyword = match.group(1) if match else None
+         if keyword:
+             response = KeywordQuery(keyword)
++            if response is None:
++                return None
+             if 'total' in response and response['total'] == 0:
+                 return None
+             if response is not None:
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/AI-Researcher/ai_researcher/src/tournament_ranking.py vendor/AI-Researcher/ai_researcher/src/tournament_ranking.py
+--- a/ai_researcher/src/tournament_ranking.py	2026-09-06 01:14:57.717233499 +0800
++++ b/ai_researcher/src/tournament_ranking.py	2026-09-06 01:34:58.034525450 +0800
+@@ -9,9 +9,38 @@
+ from tqdm import tqdm
+ import retry
+ from collections import defaultdict
++import re
+ random.seed(2024)
+ 
+ 
++def swiss_pairs(ideas, score_of):
++    """RCP notebook patch: the Swiss-system pairing rule, lifted out of single_round().
++
++    Sort the ideas by accumulated score and pair neighbours, so every match is between
++    proposals with similar scores (Sec. 3.3). With an odd number of proposals the lowest-ranked
++    one gets a bye and a free point. Returns (match_pairs, bye_or_None).
++    """
++    sorted_ideas = sorted(ideas, key=lambda idea: score_of(idea), reverse=True)
++    match_pairs, bye = [], None
++    for i in range(0, len(sorted_ideas), 2):
++        if i + 1 < len(sorted_ideas):
++            match_pairs.append((sorted_ideas[i], sorted_ideas[i + 1]))
++        else:
++            bye = sorted_ideas[i]
++    return match_pairs, bye
++
++
++def parse_choice(result):
++    """RCP notebook patch: read '1' or '2' out of a zero-shot judgment.
++
++    The original compares `result.strip() == '1'` and treats anything else as a win for idea 2,
++    so a single stray token silently biases the tournament towards the second proposal. We take
++    the last standalone 1/2 in the reply and return None when there is none.
++    """
++    tokens = re.findall(r"(?<![\w.])([12])(?![\w])", result.strip())
++    return tokens[-1] if tokens else None
++
++
+ @retry.retry(tries=3, delay=2)
+ def better_idea(idea_1, idea_2, method, openai_client, model, seed, few_shot_demos=None, temperature=0.):
+     prompt = "You are a reviewer specialized in Natural Language Processing and Large Language Models. You are given two project summaries. One of them is accepted by a top AI conference (like ICLR or ACL) and the other one is rejected. Your task is to identify the one that has been accepted.\n"
+@@ -61,29 +90,18 @@
+         if current_round == 0:
+             random.shuffle(ideas)
+         
+-        match_pairs = []
+-        # Sort ideas based on current scores
+-        sorted_ideas = sorted(ideas, key=lambda idea: scores[format_plan_json(idea)[:200]], reverse=True)
+-
+-        for i in range(0, len(sorted_ideas), 2):
+-            if i + 1 < len(sorted_ideas):
+-                match_pairs.append((sorted_ideas[i], sorted_ideas[i+1]))
+-            else:
+-                # If there is an odd number of ideas, the last one automatically wins this round
+-                scores[format_plan_json(sorted_ideas[i])[:200]] += 1
++        # Sort ideas based on current scores and pair score-matched neighbours
++        match_pairs, bye = swiss_pairs(ideas, lambda idea: scores[format_plan_json(idea)[:200]])
++        if bye is not None:
++            # If there is an odd number of ideas, the last one automatically wins this round
++            scores[format_plan_json(bye)[:200]] += 1
+ 
+         for idea1, idea2 in tqdm(match_pairs):
+             prompt, result, cost = better_idea(idea1, idea2, "zero_shot", openai_client, model, seed)
+-            if result.strip() == '1':
++            if parse_choice(result) == '1':
+                 scores[format_plan_json(idea1)[:200]] += 1
+-                # if idea1["score"] >= idea2["score"]:
+-                #     decision_correct += 1
+             else:
+                 scores[format_plan_json(idea2)[:200]] += 1
+-                # if idea1["score"] <= idea2["score"]:
+-                #     decision_correct += 1
+-
+-            # decision_all += 1
+             all_costs += cost
+         
+         return all_costs
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/AI-Researcher/ai_researcher/src/utils.py vendor/AI-Researcher/ai_researcher/src/utils.py
+--- a/ai_researcher/src/utils.py	2026-09-06 01:14:57.717233499 +0800
++++ b/ai_researcher/src/utils.py	2026-09-06 01:33:23.059346951 +0800
+@@ -2,6 +2,98 @@
+ import json
+ import random 
+ 
++# --- RCP notebook patch ------------------------------------------------------------------
++# The repo builds a separate OpenAI / Anthropic / Together client per model family. For the
++# notebook every role must go through ONE OpenAI-compatible endpoint (RCP_BASE_URL) with one
++# model (RCP_MODEL), so call_api() short-circuits to call_api_rcp() whenever RCP_BASE_URL is
++# set. Nothing else in the repo changes: the (client, model) arguments are simply ignored.
++_RCP_CLIENT = None
++
++
++def rcp_client():
++    """Singleton OpenAI-SDK client pointed at RCP_BASE_URL (OpenAI-compatible, e.g. OpenRouter)."""
++    global _RCP_CLIENT
++    if _RCP_CLIENT is None:
++        from openai import OpenAI
++
++        _RCP_CLIENT = OpenAI(
++            api_key=os.environ.get("OPENROUTER_API_KEY", ""),
++            base_url=os.environ.get("RCP_BASE_URL", "https://openrouter.ai/api/v1"),
++            timeout=600,
++            max_retries=2,
++        )
++    return _RCP_CLIENT
++
++
++RCP_USAGE_HOOK = None   # notebook sets this to a callable(usage, seconds, tag) -> None
++RCP_TAG = "ai_researcher"
++
++
++def call_api_rcp(prompt_messages, temperature=1.0, top_p=1.0, max_tokens=1000, seed=2024, json_output=False):
++    """One chat completion through RCP_MODEL; returns (text, cost) like the original call_api.
++
++    Hidden reasoning is disabled: on reasoning models the reasoning tokens count against
++    max_tokens, which truncates long JSON proposals before the closing brace.
++    """
++    import time
++
++    kwargs = dict(
++        model=os.environ.get("RCP_MODEL", "deepseek/deepseek-v4-flash"),
++        messages=prompt_messages,
++        temperature=temperature,
++        top_p=top_p,
++        max_tokens=max_tokens,
++        seed=seed,
++        extra_body={"reasoning": {"enabled": False}},
++    )
++    if json_output:
++        kwargs["response_format"] = {"type": "json_object"}
++    t0 = time.time()
++    completion = rcp_client().chat.completions.create(**kwargs)
++    usage = getattr(completion, "usage", None)
++    if RCP_USAGE_HOOK is not None:
++        RCP_USAGE_HOOK(usage, time.time() - t0, RCP_TAG)
++    cost = float(getattr(usage, "cost", 0.0) or 0.0)
++    text = (completion.choices[0].message.content or "").strip()
++    if completion.choices[0].finish_reason == "length":
++        print("[warning] response hit max_tokens and was truncated")
++    return text, cost
++
++
++def rcp_embed(texts, model="openai/text-embedding-3-small", batch=64):
++    """Sentence embeddings for the deduplication step.
++
++    The paper uses sentence-transformers `all-MiniLM-L6-v2`; that pulls in torch, which the
++    notebook environment must not use, so we try the OpenAI-compatible /embeddings endpoint
++    first and fall back to a local TF-IDF vectoriser. Returns (matrix, backend_name).
++    """
++    import numpy as np
++
++    try:
++        vecs = []
++        for i in range(0, len(texts), batch):
++            resp = rcp_client().embeddings.create(model=model, input=texts[i : i + batch])
++            vecs.extend([d.embedding for d in resp.data])
++        return np.asarray(vecs, dtype=float), model
++    except Exception as exc:  # noqa: BLE001
++        print("[embeddings] %s unavailable (%s); falling back to TF-IDF" % (model, str(exc)[:120]))
++        from sklearn.feature_extraction.text import TfidfVectorizer
++
++        m = TfidfVectorizer(ngram_range=(1, 2), stop_words="english", sublinear_tf=True)
++        return m.fit_transform(texts).toarray(), "tfidf"
++
++
++def rcp_similarity_matrix(texts, model="openai/text-embedding-3-small"):
++    """Cosine-similarity matrix with a zero diagonal (the repo's convention). -> (matrix, backend)."""
++    import numpy as np
++
++    emb, backend = rcp_embed(texts, model=model)
++    norm = emb / np.clip(np.linalg.norm(emb, axis=1, keepdims=True), 1e-12, None)
++    sim = norm @ norm.T
++    np.fill_diagonal(sim, 0)
++    return sim, backend
++
++
+ def calc_price(model, usage):
+     if "claude-3-5-sonnet" in model:
+         return (3.0 * usage.input_tokens + 15.0 * usage.output_tokens) / 1000000.0
+@@ -23,6 +115,9 @@
+     return None
+ 
+ def call_api(client, model, prompt_messages, temperature=1.0, top_p=1.0, max_tokens=1000, seed=2024, json_output=False):
++    ## RCP notebook: one OpenAI-compatible endpoint / one model for every role
++    if os.environ.get("RCP_BASE_URL"):
++        return call_api_rcp(prompt_messages, temperature, top_p, max_tokens, seed, json_output)
+     ## Anthropic models
+     if "claude" in model:
+         if json_output:

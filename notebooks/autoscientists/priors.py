@@ -81,3 +81,45 @@ def rank_queue(pending: list[dict], priors: list[AxisPrior]) -> list[dict]:
     rank = {(p.axis, p.direction): i for i, p in enumerate(priors)}
     cold_rank = min([i for i, p in enumerate(priors) if p.status == "cold"], default=len(priors))
     return sorted(pending, key=lambda it: (rank.get((it["axis"], it["direction"]), cold_rank), it.get("priority", 0)))
+
+
+def team_stats(experiments: list[dict], dead_ends: list[dict] | None = None) -> list[dict]:
+    """Per-team read-out of the shared log L: throughput, KEEPs, near-misses, dead ends, best Δ.
+
+    The paper inspects "the shared state and agent logs" to see whether deliberation changed which
+    experiments were run (Sec. 4.3, Fig. 5); this is the same read-out on the notebook's run.
+    """
+    teams: dict[str, dict] = {}
+    for e in experiments:
+        t = teams.setdefault(e["team"], {"team": e["team"], "agents": set(), "axes": set(), "experiments": 0,
+                                         "KEEP": 0, "NEAR-MISS": 0, "DISCARD": 0, "INVALID": 0,
+                                         "best_delta": None, "dead_ends": 0})
+        t["agents"].add(e["agent"])
+        t["axes"].add(e["axis"])
+        t["experiments"] += 1
+        t[e["outcome"]] = t.get(e["outcome"], 0) + 1
+        d = e["delta"]
+        if d == d and (t["best_delta"] is None or d > t["best_delta"]):   # d == d skips NaN (INVALID)
+            t["best_delta"] = d
+    for de in dead_ends or []:
+        if de.get("team") in teams:
+            teams[de["team"]]["dead_ends"] += 1
+    out = []
+    for t in teams.values():
+        out.append({**t, "agents": ",".join(sorted(t["agents"])), "n_axes": len(t["axes"]),
+                    "axes": ",".join(sorted(t["axes"])),
+                    "best_delta": None if t["best_delta"] is None else round(t["best_delta"], 4)})
+    return sorted(out, key=lambda r: -r["experiments"])
+
+
+def dead_ends_by_axis(dead_ends: list[dict]) -> list[dict]:
+    """Dead-end registry D_k folded by (axis, direction): how many refuted attempts, and the worst Δ."""
+    groups: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for d in dead_ends:
+        groups[(d["axis"], d["direction"])].append(d)
+    rows = [{"axis": a, "direction": dr, "n": len(g),
+             "teams": ",".join(sorted({x.get("team", "?") for x in g})),
+             "worst_delta": round(min(x["delta"] for x in g), 4),
+             "example": g[-1]["reason"][:70]}
+            for (a, dr), g in groups.items()]
+    return sorted(rows, key=lambda r: (-r["n"], r["axis"]))

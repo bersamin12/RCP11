@@ -29,3 +29,18 @@ trl>=0.20
 peft>=0.15
 accelerate>=1.5
 datasets>=3.0
+# Vendored-repo runtime deps for notebooks 04-10 (installed into the same venv)
+pymupdf4llm>=1.28       # 04 AI Scientist: perform_review.load_paper
+retry>=0.9              # 05 AI-Researcher modules
+absl-py>=2.0            # 06 FunSearch implementation (absl.logging)
+requests>=2.32          # 07 co-scientist literature lookup (OpenAlex / Semantic Scholar)
+dacite>=1.9             # 09 OpenEvolve config
+funcy                   # 10 AIDE (vendored on sys.path; its own requirements pull torch, so listed individually)
+humanize
+dataclasses-json
+omegaconf
+shutup
+coolname
+igraph
+genson
+black

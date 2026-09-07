@@ -58,6 +58,35 @@ ANALYST_SCHEMA_HINT = """Return JSON:
  "keep_followup": null | "<which property of the last KEEP this follows up on>"}"""
 
 
+def validate_proposals(obj: dict) -> None:
+    """The paper's per-cycle proposal rules (App. A.7), checked in Python after the model replies.
+
+    Exactly two proposals · different research directions · ambition quota (at least one bold
+    move, else a public ``[EXEMPT]`` justification). Shared by ``analyst_propose`` and by the
+    live pi analyst session so both are held to identical rules.
+    """
+    ps = obj["proposals"]
+    assert len(ps) == 2, "need exactly two proposals"
+    assert ps[0]["axis"] != ps[1]["axis"], "proposals must target different axes"
+    for p in ps:
+        assert p["direction"] in ("up", "down", "other")
+        assert p["change"] and p["axis"]
+    if not any(p.get("bold") for p in ps):
+        assert obj.get("exempt_reason"), "no bold proposal and no exempt_reason"
+
+
+def flag_proposals(proposals: list[dict], dead_ends: list[dict], recent_experiments: list[dict]) -> list[dict]:
+    """Harness-side diversity constraints (A.7 (ii)-(iii)): annotate violating proposals in place."""
+    for p in proposals:
+        for d in dead_ends:
+            if d["axis"] == p["axis"] and d["direction"] == p["direction"] and "differ" not in str(p.get("rationale", "")).lower():
+                p["flag"] = f"same (axis,direction) as dead end value={d['value']}"
+        last_two = [(e["axis"], e["direction"]) for e in recent_experiments[-2:]]
+        if len(last_two) == 2 and last_two[0] == last_two[1] == (p["axis"], p["direction"]):
+            p["flag"] = "third consecutive push in the same direction"
+    return proposals
+
+
 def analyst_propose(
     *, agent: str, team: str, hypothesis: str, champion_src: str, champion_metric: float,
     priors: list[AxisPrior], coverage: dict[str, int], dead_ends: list[dict],
@@ -100,25 +129,9 @@ Champion script:
 
 {ANALYST_SCHEMA_HINT}"""
 
-    def validate(obj):
-        ps = obj["proposals"]
-        assert len(ps) == 2, "need exactly two proposals"
-        assert ps[0]["axis"] != ps[1]["axis"], "proposals must target different axes"
-        for p in ps:
-            assert p["direction"] in ("up", "down", "other")
-            assert p["change"] and p["axis"]
-        if not any(p.get("bold") for p in ps):
-            assert obj.get("exempt_reason"), "no bold proposal and no exempt_reason"
-
-    out = common.chat_json(prompt, ANALYST_SYSTEM, validate=validate, tag="analyst", temperature=0.8)
+    out = common.chat_json(prompt, ANALYST_SYSTEM, validate=validate_proposals, tag="analyst", temperature=0.8, max_tokens=1500)
     # Harness-side enforcement of the diversity constraints
-    for p in out["proposals"]:
-        for d in dead_ends:
-            if d["axis"] == p["axis"] and d["direction"] == p["direction"] and "differ" not in p["rationale"].lower():
-                p["flag"] = f"same (axis,direction) as dead end value={d['value']}"
-        last_two = [(e["axis"], e["direction"]) for e in recent_experiments[-2:]]
-        if len(last_two) == 2 and last_two[0] == last_two[1] == (p["axis"], p["direction"]):
-            p["flag"] = "third consecutive push in the same direction"
+    flag_proposals(out["proposals"], dead_ends, recent_experiments)
     return out
 
 
@@ -140,7 +153,7 @@ Champion script:
 {champion_src}
 ```"""
     for attempt in range(3):
-        raw = common.chat(prompt, EXPERIMENT_SYSTEM, tag="experiment", temperature=0.2, max_tokens=4096)
+        raw = common.chat(prompt, EXPERIMENT_SYSTEM, tag="experiment", temperature=0.2, max_tokens=2048)
         src = common.extract_code_block(raw)
         if src is None:
             prompt += "\n\nYour reply had no ```python block. Output the complete script in one code block."
@@ -201,7 +214,7 @@ Return JSON: {{"directions": [{{"name": "...", "hypothesis": "...", "axes": ["PA
             o["ranking"] = [d.get("name", str(i)) for i, d in enumerate(o["directions"])]
         o.setdefault("critique", "")
 
-    out = common.chat_json(prompt, DISCUSSION_SYSTEM, validate=validate, tag="discussion", temperature=0.8, retries=3)
+    out = common.chat_json(prompt, DISCUSSION_SYSTEM, validate=validate, tag="discussion", temperature=0.8, retries=3, max_tokens=1600)
     if round_no >= max_rounds:
         out["vote"] = "DONE"   # protocol rule enforced by the harness
     return out
@@ -259,7 +272,7 @@ Return JSON: {{"teams": {{"<team-name>": {{"axis": "<parameter family / directio
             problems.append("with >=2 experiment agents the roster must have at least 2 teams (parallel directions)")
         assert not problems, "; ".join(problems)
 
-    return common.chat_json(prompt, CONSOLIDATE_SYSTEM, validate=validate, tag="consolidate", temperature=0.3, retries=3)
+    return common.chat_json(prompt, CONSOLIDATE_SYSTEM, validate=validate, tag="consolidate", temperature=0.3, retries=3, max_tokens=1400)
 
 
 # ----------------------------------------------------------------------------- post-KEEP induction (A.7)
@@ -272,4 +285,83 @@ Answer the two post-KEEP questions from the AutoScientists analyst protocol:
 1. Which property of the successful change made it work?
 2. What other untried changes share that property (via a different mechanism)?
 Return JSON: {{"property": "...", "followups": [{{"axis": "...", "direction": "up|down|other", "change": "..."}}]}}"""
-    return common.chat_json(prompt, tag="induction", temperature=0.5)
+    return common.chat_json(prompt, tag="induction", temperature=0.5, max_tokens=900)
+
+
+# --------------------------------------------------------------- live coding-agent role files (Alg. 1/3, A.4)
+# In the paper the backend is a Claude Code session: "each invocation is a single LLM session that
+# wakes up, executes one heartbeat, and exits" (App. A.1), reading a role-specific heartbeat file as
+# its system prompt and the shared state S from disk with its own file tools. The two constants below
+# are that role text, adapted to the notebook's toy task, and are passed to `common.run_pi` as
+# `system_prompt` so the pi session plays exactly one heartbeat of the corresponding role.
+
+PI_EXPERIMENT_ROLE = """You are an EXPERIMENT AGENT in the AutoScientists crew (heartbeat = one session, then exit).
+This is your ROLE file. Follow it literally; you have file and shell tools in the shared-state directory.
+
+Your single heartbeat (Algorithm 3):
+ 1. Read `claim.json` — the ONE experiment you have already claimed from your team queue Q_k.
+ 2. Read `train.py` — your working copy of the champion program p*.
+ 3. Apply EXACTLY the one change described in claim.json["change"] to `train.py` with the edit tool.
+    Change nothing else: keep every other line, the --seed CLI, and the final JSON output line intact.
+ 4. Train the candidate once: run `python train.py --seed <seed from claim.json>` with the bash tool.
+    The script prints one JSON line ending with {"metric": <float>, ...}.
+ 5. Write that metric to `result.json` as {"metric": <float>, "seed": <int>, "change": "<one line>"}.
+ 6. Stop. Do NOT touch any other file (the champion record, the logs, the queue, the registries are
+    written by the orchestrator, not by you), do NOT gate or promote anything yourself, and do NOT
+    run more than one training command unless it failed.
+
+The noise-aware promotion gate (Δ vs Mσ, App. A.6), the experiment log L, the [RESULT] post and the
+dead-end registry are handled by the harness after you exit."""
+
+PI_ANALYST_ROLE = """You are an ANALYST agent in the AutoScientists crew (heartbeat = one session, then exit).
+This is your ROLE file. You have read-only tools: you may run shell commands to inspect files and read
+files, but you must not modify anything.
+
+Your single heartbeat follows the list-decide-read protocol (App. A.4) — do the three steps in order:
+ 1. LIST: retrieve only lightweight metadata for the items in the shared state S first, e.g.
+    `ls -la`, `find . -type f -printf '%p %s %TY-%Tm-%Td %TH:%TM\\n'` — paths, sizes, timestamps.
+    Do not read file contents in this step.
+ 2. DECIDE: state briefly which items are relevant to a proposal cycle and read only those
+    (typically the champion record, the experiment log, the team queue, the dead-end registry).
+ 3. PROPOSE: write NOTHING to disk. Read at most six items in total, and as soon as the reads have
+    returned, emit the JSON object below as your ENTIRE final message (Algorithm 4 line 6). Never end a
+    turn with a plan, a promise to read more, or prose: the heartbeat is over once the JSON is out.
+
+Proposal rules (the harness re-checks all of them; violating them wastes the cycle):
+ * EXACTLY two proposals, each changing exactly ONE top-level numeric hyperparameter of the champion;
+ * the two proposals must target DIFFERENT axes;
+ * AMBITION QUOTA: at least one proposal must be bold (>=10% change of an already-tested parameter,
+   or a never-tested axis, or a probe that clearly confirms/falsifies the team hypothesis);
+   if neither qualifies, set "exempt_reason" to a public justification;
+ * DIVERSITY: nothing inside a range already recorded in the dead-end registry unless you say what
+   differs, and no third consecutive push of the same (axis, direction).
+
+Final message format (JSON only, no prose after it):
+{"read_files": ["<paths you decided to read>"],
+ "proposals": [{"axis": "PARAM", "direction": "up|down|other", "change": "...", "rationale": "...",
+                "bold": true|false, "expected_delta": 0.0}, {...}],
+ "exempt_reason": null | "...", "keep_followup": null | "..."}"""
+
+
+def pi_experiment_prompt(*, agent: str, team: str, hypothesis: str, seed: int, python: str = "python") -> str:
+    """The per-invocation user message for a live experiment-agent heartbeat (paper Alg. 3)."""
+    return f"""{TASK_DESCRIPTION}
+
+You are {agent} on team "{team}" (hypothesis: {hypothesis}). The current directory is the shared state S.
+Execute one heartbeat now, exactly as your role file describes: read claim.json, read train.py, apply the
+single claimed change, run `{python} train.py --seed {seed}` (use exactly this interpreter), write
+result.json, then stop and report the metric in one sentence."""
+
+
+def pi_analyst_prompt(*, agent: str, team: str, hypothesis: str, sigma: float) -> str:
+    """The per-invocation user message for a live analyst heartbeat (paper Alg. 1 line 1/9, Alg. 4)."""
+    return f"""{TASK_DESCRIPTION}
+
+You are {agent} on team "{team}" (hypothesis: {hypothesis}). The current directory is the shared state S of a
+run that already happened: champion.json / champion/ (the champion p*), logs/experiments.jsonl (the log L),
+logs/forum.jsonl (the forum F), teams/<team>/queue.json and teams/<team>/dead_ends.json (team-local state),
+knowledge/noise_pairs.json (noise-floor calibration; current σ = {sigma:.4f}, so a Δ must exceed 2σ = {2 * sigma:.4f}
+to be clearly above noise).
+
+Execute one heartbeat now: list the metadata first, decide what to read, read only that, and end with the
+JSON object of two proposals. Write nothing."""

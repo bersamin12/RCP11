@@ -1,0 +1,68 @@
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/aideml/aide/agent.py notebooks/vendor/aideml/aide/agent.py
+--- a/aide/agent.py	2026-09-06 01:15:02.214934692 +0800
++++ b/aide/agent.py	2026-09-06 01:48:17.473979065 +0800
+@@ -1,5 +1,6 @@
+ import logging
+ import math
++import os
+ import random
+ from dataclasses import dataclass
+ from typing import Any, Callable, cast
+@@ -207,6 +208,12 @@
+             "bayesian-optimization",
+             "timm",
+         ]
++        # The default list advertises packages (lightgbm, xgboost, torch, timm, ...) as
++        # "already installed", which is only true inside AIDE's own Docker image. Let the
++        # surrounding environment declare what is actually importable.
++        env_pkgs = os.environ.get("AIDE_PACKAGES")
++        if env_pkgs:
++            pkgs = [p.strip() for p in env_pkgs.split(",") if p.strip()]
+         random.shuffle(pkgs)
+         pkg_str = ", ".join([f"`{p}`" for p in pkgs])
+ 
+diff -ruN '--exclude=.git' '--exclude=__pycache__' '--exclude=.vendored_commit' /tmp/claude-1000/-mnt-berstorage-RCP-rcp-platform/de9cba1b-180f-4e1f-8524-9c10a3e0ceb0/scratchpad/repos/aideml/aide/backend/backend_openai.py notebooks/vendor/aideml/aide/backend/backend_openai.py
+--- a/aide/backend/backend_openai.py	2026-09-06 01:15:02.215117237 +0800
++++ b/aide/backend/backend_openai.py	2026-09-06 01:48:17.455948322 +0800
+@@ -59,8 +59,6 @@
+     _setup_openai_client()
+ 
+     filtered_kwargs: dict = select_values(notnone, model_kwargs)
+-    if "max_tokens" in filtered_kwargs:
+-        filtered_kwargs["max_output_tokens"] = filtered_kwargs.pop("max_tokens")
+ 
+     if (
+         re.match(r"^o\d", filtered_kwargs["model"])
+@@ -74,9 +72,32 @@
+     use_chat_api = os.getenv("OPENAI_BASE_URL") is not None and not is_openai_model
+ 
+     if use_chat_api:
++        # The chat-completions API takes `max_tokens`, not the Responses API's
++        # `max_output_tokens`. OpenRouter reserves credit for the *requested* budget and
++        # rejects an unbounded request (HTTP 402), so always send an explicit cap.
++        filtered_kwargs.setdefault(
++            "max_tokens", int(os.getenv("AIDE_MAX_TOKENS", "4096"))
++        )
++        # Reasoning models (e.g. deepseek-v4-flash) spend hidden reasoning tokens out of
++        # that same budget, which truncates the generated code block. OpenRouter accepts a
++        # `reasoning` body field to turn it off.
++        if os.getenv("AIDE_DISABLE_REASONING", "1") == "1":
++            extra_body = dict(filtered_kwargs.get("extra_body") or {})
++            extra_body["reasoning"] = {"enabled": False}
++            filtered_kwargs["extra_body"] = extra_body
++    elif "max_tokens" in filtered_kwargs:
++        filtered_kwargs["max_output_tokens"] = filtered_kwargs.pop("max_tokens")
++
++    if use_chat_api:
+         _setup_custom_client()
+         # Standard chat completions API (for local servers)
+         messages = opt_messages_to_list(system_message, user_message)
++        if os.getenv("AIDE_PROMPT_AS_USER", "1") == "1":
++            # Some chat models continue a system-only markdown prompt instead of answering it
++            # (they emit a stray fence and a "# Your response" heading), which makes
++            # `extract_code` fail and burns every `plan_and_code_query` retry. AIDE's own
++            # OpenRouter backend converts messages to the user role for the same reason.
++            messages = [{**m, "role": "user"} for m in messages]
+         if func_spec is not None:
+             filtered_kwargs["tools"] = [func_spec.as_openai_tool_dict]
+             filtered_kwargs["tool_choice"] = func_spec.openai_tool_choice_dict

@@ -28,6 +28,11 @@ class IterationLog:
     avg_best_of_k: float = 0.0    # paper Fig. 2b/3a: mean over children of s*
     llm_calls: int = 0
     seconds: float = 0.0
+    # --- instrumentation for the notebook's mechanism walkthrough (not part of Alg. 1) ---
+    buffer: list[float] = field(default_factory=list)      # rolling window R after this iteration
+    top: list[dict] = field(default_factory=list)          # top-5 pool snapshot after eviction
+    evicted_scores: list[float] = field(default_factory=list)
+    added: int = 0                                          # programs added by line 11 this iteration
 
 
 def ktpo_search(seed_src: str, seed_score: float, *, T: int, B: int, N: int, k: int,
@@ -59,15 +64,21 @@ def ktpo_search(seed_src: str, seed_score: float, *, T: int, B: int, N: int, k: 
             all_best += best_children
             for tr in trajs:                        # line 11: add valid intermediate programs
                 for s in tr.valid_children:
-                    pool.add(Program(s["src"], s["result"].score, parent=p.pid, iteration=t, origin="child"))
+                    log.added += pool.add(Program(s["src"], s["result"].score, parent=p.pid, iteration=t, origin="child"))
             beta = improvement_rate(best_children, p.score)
             mastered = tracker.record_if_mastered(beta, p.score, tau_t) if use_eviction else False
             log.parents.append({"pid": p.pid, "score": p.score, "beta": beta, "mastered": mastered,
-                                "rewards": rewards, "advantages": grpo_advantages(rewards), "best_children": best_children})
+                                "rewards": rewards, "advantages": grpo_advantages(rewards), "best_children": best_children,
+                                "traj_scores": [[st["result"].score for st in tr.steps] for tr in trajs],
+                                "traj_valid": [[st["result"].valid for st in tr.steps] for tr in trajs]})
             log.llm_calls += N * k
         if use_eviction and tracker.threshold is not None:
             log.threshold = tracker.threshold
-            log.evicted = len(pool.evict(tracker.threshold))
+            evicted = pool.evict(tracker.threshold)
+            log.evicted, log.evicted_scores = len(evicted), sorted((round(e.score, 4) for e in evicted), reverse=True)
+        log.buffer = list(tracker.mastered)
+        log.top = [{"pid": q.pid, "score": round(q.score, 4), "origin": q.origin, "born_at": q.iteration}
+                   for q in sorted(pool.programs.values(), key=lambda q: -q.score)[:5]]
         log.pool_size, log.best = len(pool), pool.best.score
         log.avg_best_of_k = sum(all_best) / len(all_best)
         log.seconds = time.time() - t0

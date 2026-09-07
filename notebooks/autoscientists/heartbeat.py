@@ -35,6 +35,63 @@ def run_train(src: str, seed: int, workdir: Path) -> float:
     return float(json.loads(out.stdout.strip().splitlines()[-1])["metric"])
 
 
+def best_so_far(experiments: list[dict], baseline: float, per_agent: bool = False) -> list[float]:
+    """Best-so-far champion metric after each experiment (the trajectory plotted in the paper's Fig. S1).
+
+    With ``per_agent`` (the *independent agents* ablation) every agent keeps its own champion and the
+    crew's best-so-far is the maximum over those private champions.
+    """
+    if not per_agent:
+        cur, out = baseline, []
+        for e in experiments:
+            if e["outcome"] == "KEEP":
+                cur = e["metric"]
+            out.append(cur)
+        return out
+    champs: dict[str, float] = {}
+    out = []
+    for e in experiments:
+        if e["outcome"] == "KEEP":
+            champs[e["agent"]] = e["metric"]
+        out.append(max([baseline, *champs.values()]))
+    return out
+
+
+def record_experiment(*, state: SharedState, noise: NoiseFloor, item: dict, agent: str, team: str,
+                      src: str, metric: float, seed: int, cycle: int, confirm, diff: str = "",
+                      queue=None) -> tuple:
+    """Alg. 3 lines 3-10: gate the candidate, log it to L, release the claim, post to F.
+
+    This is the single code path used both by ``Crew.experiment_cycle`` (API-driven agents) and by
+    the live pi coding-agent session in the notebook, so a heartbeat run by a real coding agent is
+    recorded exactly like one run through the API.
+    """
+    champ = state.champion
+    decision = promote(metric, champ["metric"], noise, confirm=confirm)
+    if decision.branch == "confirm":
+        state.add_noise_pair(metric, decision.second_metric, code_hash(src))
+        if noise.locked_sigma is not None and state.noise_pairs()["locked_sigma"] is None:
+            state.lock_sigma(noise.locked_sigma)
+    outcome = "KEEP" if decision.promote else ("NEAR-MISS" if decision.branch == "confirm" else "DISCARD")
+    exp = Experiment(item["exp_id"], team, agent, item["axis"], item["direction"], item["change"],
+                     champ["metric"], metric, decision.delta, outcome, seed, cycle,
+                     decision.second_metric, champ["code_hash"], code_hash(src), item.get("post_id"))
+    state.log_experiment(exp)
+    if queue is not None:
+        queue.release(item["exp_id"], agent, outcome)
+    if decision.promote:
+        state.promote(src, metric, seed, agent, item["exp_id"])
+        state.post("[RESULT]", agent, f"KEEP {item['axis']} {item['direction']}: {decision.detail}\n{diff}",
+                   thread=item.get("post_id"), outcome=outcome, delta=decision.delta)
+        state.post("[KEEP]", agent, item["change"], exp_id=item["exp_id"], delta=decision.delta)
+    else:
+        state.post("[NEAR-MISS]" if outcome == "NEAR-MISS" else "[RESULT]", agent,
+                   f"{outcome} {item['axis']} {item['direction']}: {decision.detail}",
+                   thread=item.get("post_id"), outcome=outcome, delta=decision.delta)
+        state.add_dead_end(team, item["axis"], item["direction"], item["change"], decision.delta, decision.detail)
+    return decision, outcome, exp
+
+
 @dataclass
 class Flags:
     no_analyst: bool = False      # experiment agents propose for themselves
@@ -55,11 +112,13 @@ class Crew:
     cycle: int = 0
     log: list[str] = field(default_factory=list)
     private: dict = field(default_factory=dict)   # for the `independent` ablation
+    verbose: bool = True
 
     # ------------------------------------------------------------------ helpers
     def _say(self, msg: str) -> None:
         self.log.append(f"[cycle {self.cycle}] {msg}")
-        print(self.log[-1])
+        if self.verbose:
+            print(self.log[-1])
 
     def _next_seed(self) -> int:
         self.seed_counter += 1
@@ -68,10 +127,35 @@ class Crew:
     @property
     def crew(self) -> list[str]:
         """Fixed heartbeat rotation; analysts first so the queues are filled before experiment agents wake."""
+        if self.flags.independent:
+            return list(self.experiment_agents)   # solo loops: no analysts, no shared coordination
         return ([] if self.flags.no_analyst else self.analysts) + self.experiment_agents
+
+    # ------------------------------------------------------------------ `independent` ablation (Sec. 4.5)
+    def _ctx(self, agent: str) -> tuple[SharedState, NoiseFloor]:
+        """The state/noise floor an agent may see: the shared S, or its own private copy when isolated.
+
+        Sec. 4.5 (4): "removes both cross-agent feedback and the shared state (champion program,
+        results log, dead-end registry, and accumulated knowledge), so each agent runs a solo loop
+        maintaining only its own private state and cannot observe any other agent's results."
+        """
+        if not self.flags.independent:
+            return self.state, self.noise
+        if agent not in self.private:
+            st = SharedState(self.state.root / "private" / agent, champion_src=self.state.champion_src, reset=True)
+            st.set_baseline(self.state.champion["metric"], self.state.champion.get("seed") or 0)
+            st.write_roster({f"solo-{agent}": {"axis": "solo search", "members": [agent],
+                                               "hypothesis": "one agent, one private champion, no shared record"}},
+                            author=agent)
+            self.private[agent] = (st, NoiseFloor(default_sigma=self.noise.default_sigma))
+        return self.private[agent]
 
     # ------------------------------------------------------------------ Alg. 1 dispatch
     def heartbeat(self, agent: str) -> str:
+        if self.flags.independent:
+            # No forum, no roster, no other agents to read: the solo loop is Alg. 4 line 6 followed
+            # immediately by Alg. 3 against the agent's own private state.
+            return self.experiment_cycle(agent)
         s = self.state
         roster = s.roster
         trigger = self._open_trigger()
@@ -167,25 +251,26 @@ class Crew:
         return self._propose(agent, team)
 
     def _propose(self, agent: str, team: str) -> str:
-        s = self.state
+        s, noise = self._ctx(agent)
         exps = s.experiments()
         champ = s.champion
-        priors = axis_priors(exps, self.noise.sigma)
+        priors = axis_priors(exps, noise.sigma)
         coverage = coverage_audit(s.champion_src, exps)
         keeps = [e for e in exps if e["outcome"] == "KEEP"]
         tinfo = s.roster["teams"][team]
+        local_only = self.flags.no_cross_agent or self.flags.independent
         out = llm.analyst_propose(
             agent=agent, team=team, hypothesis=tinfo.get("hypothesis", tinfo.get("axis", "")),
             champion_src=s.champion_src, champion_metric=champ["metric"], priors=priors, coverage=coverage,
-            dead_ends=s.dead_ends(team) if self.flags.no_cross_agent else s.all_dead_ends(),
-            recent_experiments=exps, last_keep=keeps[-1] if keeps else None, sigma=self.noise.sigma,
+            dead_ends=s.dead_ends(team) if local_only else s.all_dead_ends(),
+            recent_experiments=exps, last_keep=keeps[-1] if keeps else None, sigma=noise.sigma,
         )
         items = []
         # Cross-team dedup (Sec. 3.2 "share successes and failures to reduce redundant exploration"):
         # a proposal already pending or claimed in ANOTHER team's queue is not queued again.
         pending_elsewhere = set()
         for other in s.roster["teams"]:
-            if other == team or not self.flags.no_cross_agent:
+            if other == team or not local_only:
                 pending_elsewhere |= {(it["axis"], it["direction"]) for it in s.queue(other).snapshot()["pending"]}
         for p in out["proposals"]:
             if (p["axis"], p["direction"]) in pending_elsewhere:
@@ -205,12 +290,12 @@ class Crew:
 
     # ------------------------------------------------------------------ Alg. 3 experiment agent
     def experiment_cycle(self, agent: str) -> str:
-        s = self.state
+        s, noise = self._ctx(agent)
         team = s.team_of(agent)
         q = s.queue(team)
         item = q.claim(agent)
         if item is None:
-            if self.flags.no_analyst:      # ablation: experiment agents propose for themselves
+            if self.flags.no_analyst or self.flags.independent:  # agents propose for themselves
                 self._propose(agent, team)
                 item = q.claim(agent)
             if item is None:
@@ -227,36 +312,52 @@ class Crew:
                                         champ["metric"], float("nan"), float("nan"), "INVALID", -1, self.cycle,
                                         parent_hash=champ["code_hash"], proposal_post=item["post_id"]))
             return f"{agent}: {item['axis']} INVALID ({str(exc)[:80]})"
-        decision = promote(metric, champ["metric"], self.noise, confirm=lambda: run_train(src, self._next_seed(), s.root / "runs"))
-        if decision.branch == "confirm":
-            s.add_noise_pair(metric, decision.second_metric, code_hash(src))
-            if self.noise.locked_sigma is not None and s.noise_pairs()["locked_sigma"] is None:
-                s.lock_sigma(self.noise.locked_sigma)
-        outcome = "KEEP" if decision.promote else ("NEAR-MISS" if decision.branch == "confirm" else "DISCARD")
-        exp = Experiment(item["exp_id"], team, agent, item["axis"], item["direction"], item["change"], champ["metric"],
-                         metric, decision.delta, outcome, seed, self.cycle, decision.second_metric,
-                         champ["code_hash"], code_hash(src), item["post_id"])
-        s.log_experiment(exp)
-        q.release(item["exp_id"], agent, outcome)
-        if decision.promote:
-            s.promote(src, metric, seed, agent, item["exp_id"])
-            s.post("[RESULT]", agent, f"KEEP {item['axis']} {item['direction']}: {decision.detail}\n{diff}", thread=item["post_id"], outcome=outcome, delta=decision.delta)
-            s.post("[KEEP]", agent, item["change"], exp_id=item["exp_id"], delta=decision.delta)
-        else:
-            s.post("[NEAR-MISS]" if outcome == "NEAR-MISS" else "[RESULT]", agent,
-                   f"{outcome} {item['axis']} {item['direction']}: {decision.detail}", thread=item["post_id"], outcome=outcome, delta=decision.delta)
-            s.add_dead_end(team, item["axis"], item["direction"], item["change"], decision.delta, decision.detail)
+        decision, outcome, _ = record_experiment(
+            state=s, noise=noise, item=item, agent=agent, team=team, src=src, metric=metric, seed=seed,
+            cycle=self.cycle, confirm=lambda: run_train(src, self._next_seed(), s.root / "runs"),
+            diff=diff, queue=q)
         return f"{agent}: {item['axis']}/{item['direction']} metric={metric:.4f} Δ={decision.delta:+.4f} [{decision.branch}] → {outcome}"
 
     # ------------------------------------------------------------------ driver
+    def _invoke(self, agent: str) -> None:
+        """One invocation. A session that dies (API error, timeout) costs its heartbeat and no more:
+        App. A.1's loop passes only the agent's identity, so the next invocation re-reads S and continues."""
+        try:
+            self._say(self.heartbeat(agent))
+        except Exception as exc:  # noqa: BLE001
+            self._say(f"{agent}: heartbeat FAILED ({type(exc).__name__}: {str(exc)[:120]}) — invocation lost, loop continues")
+
     def run_cycles(self, n: int) -> None:
         for _ in range(n):
             self.cycle += 1
             for agent in self.crew:
-                self._say(self.heartbeat(agent))
+                self._invoke(agent)
+            if self.flags.independent:
+                continue
             # keep discussing (extra rounds within the same cycle) until a roster exists
             rounds = 0
             while (self._open_trigger() is not None or not self.state.roster["teams"]) and rounds < self.max_discussion_rounds + 1:
                 rounds += 1
                 for agent in self.crew:
-                    self._say(self.heartbeat(agent))
+                    self._invoke(agent)
+
+    # ------------------------------------------------------------------ read-out (shared or private)
+    @property
+    def baseline(self) -> float:
+        h = self.state.champion["history"]
+        return h[0]["metric"] if h else self.state.champion["metric"]
+
+    def all_experiments(self) -> list[dict]:
+        """The crew's experiments: the shared log L, or the union of the private logs when isolated."""
+        if not self.flags.independent:
+            return self.state.experiments()
+        rows = [e for st, _ in self.private.values() for e in st.experiments()]
+        return sorted(rows, key=lambda e: e["timestamp"])
+
+    def best_metric(self) -> float:
+        if not self.flags.independent:
+            return self.state.champion["metric"]
+        return max([self.baseline] + [st.champion["metric"] for st, _ in self.private.values()])
+
+    def trajectory(self) -> list[float]:
+        return best_so_far(self.all_experiments(), self.baseline, per_agent=self.flags.independent)

@@ -263,3 +263,122 @@ def banner() -> None:
         f"Model: `{e['model']}` via `{e['base_url']}` · QUICK mode: `{QUICK}` · "
         f"outputs → `{OUTPUT_DIR.relative_to(REPO_ROOT)}`"
     )
+
+
+# --------------------------------------------------------------------------- pi coding-agent sessions
+PI_MODEL_ENV = "NB_PI_MODEL"   # override the pi model (default: RCP_MODEL via OpenRouter)
+
+
+@dataclass
+class PiStep:
+    kind: str                  # "thinking" | "text" | "tool_call" | "tool_result"
+    text: str = ""
+    tool: str = ""
+    args: dict = field(default_factory=dict)
+    is_error: bool = False
+
+
+@dataclass
+class PiRun:
+    prompt: str
+    cwd: str
+    steps: list[PiStep]
+    final_text: str
+    returncode: int
+    seconds: float
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+    turns: int = 0
+    stderr: str = ""
+
+    def tool_calls(self) -> list[PiStep]:
+        return [s for s in self.steps if s.kind == "tool_call"]
+
+    def show(self, max_chars: int = 600) -> None:
+        """Render the session as a compact transcript in the notebook."""
+        lines = [f"**pi session** · cwd `{self.cwd}` · {self.turns} turns · {len(self.tool_calls())} tool calls · "
+                 f"{self.input_tokens} in / {self.output_tokens} out tokens · ${self.cost_usd:.4f} · {self.seconds:.0f}s · exit {self.returncode}", ""]
+        lines.append(f"> **prompt:** {self.prompt[:max_chars]}{'…' if len(self.prompt) > max_chars else ''}", )
+        for s in self.steps:
+            if s.kind == "thinking":
+                continue
+            if s.kind == "tool_call":
+                arg = json.dumps(s.args)
+                lines.append(f"- 🔧 `{s.tool}` {arg[:max_chars]}{'…' if len(arg) > max_chars else ''}")
+            elif s.kind == "tool_result":
+                t = s.text.strip().replace("\n", "\n  ")
+                lines.append(f"  - {'❌' if s.is_error else '↩'} `{t[:max_chars]}{'…' if len(t) > max_chars else ''}`")
+            elif s.kind == "text":
+                lines.append(f"- 💬 {s.text[:max_chars]}{'…' if len(s.text) > max_chars else ''}")
+        md("\n".join(lines))
+
+
+def pi_available() -> bool:
+    import shutil
+
+    return shutil.which("pi") is not None
+
+
+def run_pi(prompt: str, *, cwd: str | Path, tools: str = "read,bash,edit,write", timeout: int = 600,
+           system_prompt: str | None = None, model: str | None = None, tag: str = "pi",
+           thinking: str = "off", extra_args: list[str] | None = None) -> PiRun:
+    """Run one short, ephemeral, non-interactive pi coding-agent session and parse its JSON event stream.
+
+    The session uses the project's OpenRouter key and model (``RCP_MODEL``; override with ``model`` or
+    ``NB_PI_MODEL``), an explicit tool allowlist, no saved session, no extensions/skills/context files,
+    and a hard wall-clock timeout. Token usage and cost are added to ``USAGE``.
+    """
+    if not pi_available():
+        raise RuntimeError("pi is not installed: npm install -g --ignore-scripts @earendil-works/pi-coding-agent")
+    e = env()
+    model = model or os.environ.get(PI_MODEL_ENV) or e["model"]
+    cmd = ["pi", "--provider", "openrouter", "--model", model, "--no-session", "--no-extensions", "--no-skills",
+           "--no-prompt-templates", "--no-context-files", "--thinking", thinking, "--mode", "json", "-p"]
+    if tools:
+        cmd += ["--tools", tools]
+    else:
+        cmd += ["--no-tools"]
+    if system_prompt:
+        cmd += ["--system-prompt", system_prompt]
+    cmd += list(extra_args or [])
+    cmd.append(prompt)
+    penv = {**os.environ, "OPENROUTER_API_KEY": e["api_key"]}
+    t0 = time.time()
+    try:
+        proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout, env=penv)
+        rc, out, err = proc.returncode, proc.stdout, proc.stderr
+    except subprocess.TimeoutExpired as exc:
+        rc, out, err = -9, (exc.stdout or b"").decode() if isinstance(exc.stdout, bytes) else (exc.stdout or ""), f"timeout after {timeout}s"
+    steps: list[PiStep] = []
+    final_text, turns, in_tok, out_tok, cost = "", 0, 0, 0, 0.0
+    for line in out.splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        t = ev.get("type")
+        if t == "message_end" and ev.get("message", {}).get("role") == "assistant":
+            msg = ev["message"]
+            turns += 1
+            for c in msg.get("content", []):
+                if c.get("type") == "thinking":
+                    steps.append(PiStep("thinking", c.get("thinking", "")))
+                elif c.get("type") == "text":
+                    steps.append(PiStep("text", c.get("text", "")))
+                    final_text = c.get("text", "") or final_text
+                elif c.get("type") == "toolCall":
+                    steps.append(PiStep("tool_call", tool=c.get("name", ""), args=c.get("arguments", {}) or {}))
+            u = msg.get("usage") or {}
+            in_tok += int(u.get("input", 0) or 0)
+            out_tok += int(u.get("output", 0) or 0)
+            cst = u.get("cost") or {}
+            cost += float(cst.get("total", 0.0) or 0.0)
+        elif t == "tool_execution_end":
+            txt = "\n".join(p.get("text", "") for p in (ev.get("result") or {}).get("content", []) if p.get("type") == "text")
+            steps.append(PiStep("tool_result", txt, tool=ev.get("toolName", ""), is_error=bool(ev.get("isError"))))
+    run = PiRun(prompt, str(cwd), steps, final_text, rc, time.time() - t0, in_tok, out_tok, cost, turns, err[-2000:])
+    from types import SimpleNamespace
+
+    USAGE.add(SimpleNamespace(prompt_tokens=in_tok, completion_tokens=out_tok, cost=cost), run.seconds, tag)
+    return run

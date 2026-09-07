@@ -1,0 +1,10 @@
+[
+  {
+    "Name": "hidden_width_scaling",
+    "Title": "Hidden Width Scaling: How the width of a single hidden layer trades off fit and generalisation on small datasets.",
+    "Experiment": "In this experiment we vary the number of hidden units (16, 64, 256) while keeping every other hyperparameter fixed, and compare mean test accuracy, test log-loss and training time across the two datasets.",
+    "Interestingness": 4,
+    "Feasibility": 10,
+    "Novelty": 2
+  }
+]
