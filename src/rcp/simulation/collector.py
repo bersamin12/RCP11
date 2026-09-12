@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 
 from rcp.objects import AnalysisProtocol, ExperimentSpec, ResultBundle
-from rcp.simulation.registry import get_model
+from rcp.simulation.registry import DATACENTER_BENCHMARK_PROFILES, get_model
 from rcp.simulation.validation import runtime_plausibility_warnings
 
 
@@ -143,7 +143,7 @@ def compute_metrics(
     power = series.get("P_cool")
     if power:
         metrics["P_cool_avg_W"] = round(sum(power) / len(power), 1)
-    if profile == "chiller_benchmark":
+    if profile in DATACENTER_BENCHMARK_PROFILES:
         protocol = protocol or AnalysisProtocol()
         temp_k = series.get("T_room_K", [])
         e_hvac = series.get("E_HVAC_J", [])

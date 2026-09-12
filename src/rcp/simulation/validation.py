@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 
 from rcp.objects import ExperimentSpec, ModelValidationReport, ValidationReferenceCase
-from rcp.simulation.registry import ModelInfo, get_model
+from rcp.simulation.registry import DATACENTER_BENCHMARK_PROFILES, ModelInfo, get_model
 from rcp.simulation.registry import MODELS_DIR
 
 
@@ -43,7 +43,7 @@ def _defaults(model: ModelInfo) -> dict[str, float]:
 def validate_model(name: str) -> ModelValidationReport:
     """Run deterministic analytic reference cases; no Modelica installation is required."""
     model = get_model(name)
-    if model.metric_profile == "chiller_benchmark":
+    if model.metric_profile in DATACENTER_BENCHMARK_PROFILES:
         lock_path = MODELS_DIR / "models.lock.json"
         lock = json.loads(lock_path.read_text()) if lock_path.exists() else {}
         wrapper = model.path.read_text() if model.path.exists() else ""
@@ -200,7 +200,7 @@ def runtime_plausibility_warnings(
 ) -> list[str]:
     model = get_model(spec.model_name)
     warnings: list[str] = []
-    if model.metric_profile == "chiller_benchmark":
+    if model.metric_profile in DATACENTER_BENCHMARK_PROFILES:
         warnings.append(
             "This Buildings benchmark has upstream regression coverage but is not calibrated to a physical facility."
         )
@@ -239,7 +239,7 @@ def runtime_plausibility_warnings(
         mismatch = max(abs(p - q / params["COP"]) for p, q in zip(power, qcool))
         if mismatch > max(1.0, params["Q_cool_max"] / params["COP"] * 0.001):
             warnings.append("P_cool is inconsistent with Q_cool/COP beyond the runtime tolerance.")
-    if model.metric_profile == "chiller_benchmark":
+    if model.metric_profile in DATACENTER_BENCHMARK_PROFILES:
         room_temp = series.get("T_room_K", [])
         assessed = model.operating_range.get("T_room_K")
         if room_temp and assessed and (

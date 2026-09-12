@@ -1,0 +1,66 @@
+<h2>Stage 1 — the four fixes</h2>
+<p class="subtitle">What is wrong now, and what we replace it with.</p>
+
+<div class="mockup">
+  <div class="mockup-body" style="padding:0">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-bottom:1px solid var(--border)">
+      <div style="padding:9px 16px;background:var(--bg-tertiary);font-weight:600;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-secondary)">Problem now</div>
+      <div style="padding:9px 16px;background:var(--bg-tertiary);font-weight:600;font-size:12px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-secondary);border-left:1px solid var(--border)">Fix</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+      <div style="padding:16px;font-size:13.5px;line-height:1.7">
+        <strong style="color:var(--error)">1. Never follows references</strong><br>
+        It runs 4 keyword searches and stops. If a paper uses different words, it is invisible &mdash; and that is the paper that makes your gap fake.
+      </div>
+      <div style="padding:16px;font-size:13.5px;line-height:1.7;border-left:1px solid var(--border)">
+        Take the papers that passed screening. Pull <strong>what they cite</strong> and <strong>who cites them</strong>. Screen those too. Repeat.<br>
+        <span style="color:var(--text-secondary)">Both OpenAlex and Semantic Scholar give this free. This is what grows the wide pile to a few hundred.</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+      <div style="padding:16px;font-size:13.5px;line-height:1.7">
+        <strong style="color:var(--error)">2. Matches by counting shared words</strong><br>
+        &ldquo;server room chilled water&rdquo; scores near zero against &ldquo;data centre cooling&rdquo;. This is <strong>half</strong> the ranking score today.
+      </div>
+      <div style="padding:16px;font-size:13.5px;line-height:1.7;border-left:1px solid var(--border)">
+        Match on <strong>meaning</strong>, not words, using a small model that runs on your own machine. Free, fast, no API cost, same answer every time.<br>
+        <span style="color:var(--text-secondary)">For the 20 core papers only, a cheap LLM also reads the abstract and says yes or no with a reason.</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
+      <div style="padding:16px;font-size:13.5px;line-height:1.7">
+        <strong style="color:var(--error)">3. No retraction check</strong><br>
+        A withdrawn paper can quietly become the evidence behind a research gap.
+      </div>
+      <div style="padding:16px;font-size:13.5px;line-height:1.7;border-left:1px solid var(--border)">
+        OpenAlex already tells you if a paper is retracted, and Crossref lists withdrawal notices. Check both, drop it, and <strong>write down why</strong>.<br>
+        <span style="color:var(--text-secondary)">Also drop editorials and covers, which OpenAlex flags separately.</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr">
+      <div style="padding:16px;font-size:13.5px;line-height:1.7">
+        <strong style="color:var(--error)">4. Punishes published preprints</strong><br>
+        An arXiv paper scores 0.18 for credibility even if it appeared in a good journal two years later.
+      </div>
+      <div style="padding:16px;font-size:13.5px;line-height:1.7;border-left:1px solid var(--border)">
+        Before scoring, go looking for the published version by title and author. If it exists, use it instead and note the swap.<br>
+        <span style="color:var(--text-secondary)">Your merge step already joins them when both happen to turn up. This makes it deliberate.</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">Does this stage need self-improvement? &nbsp;&mdash;&nbsp; Yes, and it is the easiest place to do it honestly</div>
+  <div class="mockup-body" style="padding:18px;font-size:13.5px;line-height:1.8">
+    <p style="margin:0 0 12px"><strong>You already produce the answer key by accident.</strong> Every time you approve the paper list and remove a paper, you have told the system it was wrong. Every paper you keep is a correct call. Nobody has to label anything.</p>
+    <p style="margin:0 0 12px">So over runs the system can learn four small things: which kinds of search query actually return papers you keep, which venues in this field are worth trusting, where to set the include/exclude line, and how to weight the ranking instead of the hand-picked 0.50 / 0.20 / 0.12 / 0.10 / 0.08.</p>
+    <p style="margin:0;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:12px"><strong style="color:var(--warning)">Keep it small.</strong> A few runs gives a few hundred decisions. That is enough to tune a handful of numbers. It is not enough to rewrite prompts freely. And hold back some runs to check the tuning actually helps, or you will just fit it to your first three topics.</p>
+  </div>
+</div>

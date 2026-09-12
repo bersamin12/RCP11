@@ -13,22 +13,91 @@
       "Successful execution is exploratory evidence and must not be described as publication-strength validation."
     ],
     "operating_range": {
-      "Q_it": {"min": 10000, "max": 120000, "unit": "W"},
-      "T_amb": {"min": 10, "max": 40, "unit": "degC"},
-      "T_set": {"min": 18, "max": 30, "unit": "degC"},
-      "T": {"min": 15, "max": 45, "unit": "degC"}
+      "Q_it": {
+        "min": 10000,
+        "max": 120000,
+        "unit": "W"
+      },
+      "T_amb": {
+        "min": 10,
+        "max": 40,
+        "unit": "degC"
+      },
+      "T_set": {
+        "min": 18,
+        "max": 30,
+        "unit": "degC"
+      },
+      "T": {
+        "min": 15,
+        "max": 45,
+        "unit": "degC"
+      }
     },
     "default_stop_time": 86400,
-    "outputs": ["T", "Q_cool", "P_cool", "E_cool"],
+    "outputs": [
+      "T",
+      "Q_cool",
+      "P_cool",
+      "E_cool"
+    ],
     "parameters": {
-      "Q_it": {"default": 50000, "min": 1000, "max": 500000, "unit": "W", "description": "IT heat load"},
-      "C_room": {"default": 2000000, "min": 100000, "max": 100000000, "unit": "J/K", "description": "Room thermal capacitance"},
-      "UA": {"default": 2000, "min": 0, "max": 50000, "unit": "W/K", "description": "Envelope conductance to ambient"},
-      "T_amb": {"default": 30, "min": -20, "max": 55, "unit": "degC", "description": "Ambient temperature"},
-      "T_set": {"default": 24, "min": 15, "max": 35, "unit": "degC", "description": "Cooling setpoint"},
-      "Q_cool_max": {"default": 80000, "min": 1000, "max": 1000000, "unit": "W", "description": "Maximum cooling capacity"},
-      "k_p": {"default": 20000, "min": 100, "max": 1000000, "unit": "W/K", "description": "Proportional controller gain"},
-      "COP": {"default": 3.5, "min": 1.0, "max": 10.0, "unit": "-", "description": "Cooling coefficient of performance"}
+      "Q_it": {
+        "default": 50000,
+        "min": 1000,
+        "max": 500000,
+        "unit": "W",
+        "description": "IT heat load"
+      },
+      "C_room": {
+        "default": 2000000,
+        "min": 100000,
+        "max": 100000000,
+        "unit": "J/K",
+        "description": "Room thermal capacitance"
+      },
+      "UA": {
+        "default": 2000,
+        "min": 0,
+        "max": 50000,
+        "unit": "W/K",
+        "description": "Envelope conductance to ambient"
+      },
+      "T_amb": {
+        "default": 30,
+        "min": -20,
+        "max": 55,
+        "unit": "degC",
+        "description": "Ambient temperature"
+      },
+      "T_set": {
+        "default": 24,
+        "min": 15,
+        "max": 35,
+        "unit": "degC",
+        "description": "Cooling setpoint"
+      },
+      "Q_cool_max": {
+        "default": 80000,
+        "min": 1000,
+        "max": 1000000,
+        "unit": "W",
+        "description": "Maximum cooling capacity"
+      },
+      "k_p": {
+        "default": 20000,
+        "min": 100,
+        "max": 1000000,
+        "unit": "W/K",
+        "description": "Proportional controller gain"
+      },
+      "COP": {
+        "default": 3.5,
+        "min": 1.0,
+        "max": 10.0,
+        "unit": "-",
+        "description": "Cooling coefficient of performance"
+      }
     }
   },
   "ChillerCooledIntegrated": {
@@ -36,22 +105,63 @@
     "class_name": "RCPBenchmarks.ChillerCooledIntegrated",
     "description": "LBNL Buildings 13.0.0 integrated primary-secondary waterside-economizer benchmark with stable RCP inputs and outputs.",
     "source": "library-wrapper",
-    "libraries": {"Modelica": "4.1.0", "Buildings": "13.0.0"},
+    "libraries": {
+      "Modelica": "4.1.0",
+      "Buildings": "13.0.0"
+    },
     "metric_profile": "chiller_benchmark",
     "validation_status": "library-validated",
     "model_version": "13.0.0-rcp1",
     "validation_report_id": "Buildings-13.0.0-ChillerCooledIntegrated",
     "default_stop_time": 86400,
-    "outputs": ["T_room_K", "P_HVAC_W", "P_IT_W", "E_HVAC_J", "E_IT_J", "free_cooling_s", "partial_mechanical_s", "full_mechanical_s", "mode_switches"],
+    "outputs": [
+      "T_room_K",
+      "P_HVAC_W",
+      "P_IT_W",
+      "E_HVAC_J",
+      "E_IT_J",
+      "free_cooling_s",
+      "partial_mechanical_s",
+      "full_mechanical_s",
+      "mode_switches"
+    ],
     "parameters": {
-      "Q_room": {"default": 500000, "min": 300000, "max": 700000, "unit": "W", "description": "Computer-room heat load"},
-      "T_chw_set": {"default": 281.15, "min": 277.15, "max": 285.15, "unit": "K", "description": "Chilled-water supply setpoint"}
+      "Q_room": {
+        "default": 500000,
+        "min": 300000,
+        "max": 700000,
+        "unit": "W",
+        "description": "Computer-room heat load"
+      },
+      "T_chw_set": {
+        "default": 281.15,
+        "min": 277.15,
+        "max": 285.15,
+        "unit": "K",
+        "description": "Chilled-water supply setpoint"
+      }
     },
     "operating_range": {
-      "Q_room": {"min": 400000, "max": 600000, "unit": "W"},
-      "T_chw_set": {"min": 279.15, "max": 283.15, "unit": "K"},
-      "T_room_K": {"min": 288.15, "max": 318.15, "unit": "K"},
-      "P_HVAC_W": {"min": 0, "max": 2000000, "unit": "W"}
+      "Q_room": {
+        "min": 400000,
+        "max": 600000,
+        "unit": "W"
+      },
+      "T_chw_set": {
+        "min": 279.15,
+        "max": 283.15,
+        "unit": "K"
+      },
+      "T_room_K": {
+        "min": 288.15,
+        "max": 318.15,
+        "unit": "K"
+      },
+      "P_HVAC_W": {
+        "min": 0,
+        "max": 2000000,
+        "unit": "W"
+      }
     },
     "limitations": [
       "Library regression validation does not constitute calibration against a physical facility.",
@@ -65,27 +175,153 @@
     "class_name": "RCPBenchmarks.ChillerCooledNonIntegrated",
     "description": "LBNL Buildings 13.0.0 non-integrated primary-secondary waterside-economizer benchmark and comparison baseline.",
     "source": "library-wrapper",
-    "libraries": {"Modelica": "4.1.0", "Buildings": "13.0.0"},
+    "libraries": {
+      "Modelica": "4.1.0",
+      "Buildings": "13.0.0"
+    },
     "metric_profile": "chiller_benchmark",
     "validation_status": "library-validated",
     "model_version": "13.0.0-rcp1",
     "validation_report_id": "Buildings-13.0.0-ChillerCooledNonIntegrated",
     "default_stop_time": 86400,
-    "outputs": ["T_room_K", "P_HVAC_W", "P_IT_W", "E_HVAC_J", "E_IT_J", "free_cooling_s", "partial_mechanical_s", "full_mechanical_s", "mode_switches"],
+    "outputs": [
+      "T_room_K",
+      "P_HVAC_W",
+      "P_IT_W",
+      "E_HVAC_J",
+      "E_IT_J",
+      "free_cooling_s",
+      "partial_mechanical_s",
+      "full_mechanical_s",
+      "mode_switches"
+    ],
     "parameters": {
-      "Q_room": {"default": 500000, "min": 300000, "max": 700000, "unit": "W", "description": "Computer-room heat load"},
-      "T_chw_set": {"default": 281.15, "min": 277.15, "max": 285.15, "unit": "K", "description": "Chilled-water supply setpoint"}
+      "Q_room": {
+        "default": 500000,
+        "min": 300000,
+        "max": 700000,
+        "unit": "W",
+        "description": "Computer-room heat load"
+      },
+      "T_chw_set": {
+        "default": 281.15,
+        "min": 277.15,
+        "max": 285.15,
+        "unit": "K",
+        "description": "Chilled-water supply setpoint"
+      }
     },
     "operating_range": {
-      "Q_room": {"min": 400000, "max": 600000, "unit": "W"},
-      "T_chw_set": {"min": 279.15, "max": 283.15, "unit": "K"},
-      "T_room_K": {"min": 288.15, "max": 318.15, "unit": "K"},
-      "P_HVAC_W": {"min": 0, "max": 2000000, "unit": "W"}
+      "Q_room": {
+        "min": 400000,
+        "max": 600000,
+        "unit": "W"
+      },
+      "T_chw_set": {
+        "min": 279.15,
+        "max": 283.15,
+        "unit": "K"
+      },
+      "T_room_K": {
+        "min": 288.15,
+        "max": 318.15,
+        "unit": "K"
+      },
+      "P_HVAC_W": {
+        "min": 0,
+        "max": 2000000,
+        "unit": "W"
+      }
     },
     "limitations": [
       "Library regression validation does not constitute calibration against a physical facility.",
       "The benchmark uses the DRYCOLD weather profile and a simplified computer-room load model.",
       "Primary HVAC energy linearly bridges mover-power event samples outside the preregistered 0-2 MW physical screen; raw upstream energy is retained separately.",
+      "Results are valid only for the pinned Buildings and OpenModelica versions."
+    ]
+  },
+  "DXCooledAirsideEconomizer": {
+    "file": "AirCooledBenchmarks.mo",
+    "class_name": "RCPAirCooled.DXCooledAirsideEconomizer",
+    "description": "LBNL Buildings 13.0.0 air-cooled DX data-center benchmark with an airside economizer (free / partial-mechanical / full-mechanical cooling modes) on Chicago-OHare TMY3 weather, with stable RCP inputs and outputs.",
+    "source": "library-wrapper",
+    "libraries": {
+      "Modelica": "4.1.0",
+      "Buildings": "13.0.0"
+    },
+    "metric_profile": "dx_benchmark",
+    "validation_status": "library-validated",
+    "model_version": "13.0.0-rcp1",
+    "validation_report_id": "Buildings-13.0.0-DXCooledAirsideEconomizer",
+    "default_start_time": 11880000,
+    "default_stop_time": 12600000,
+    "default_intervals": 14400,
+    "outputs": [
+      "T_room_K",
+      "P_HVAC_W",
+      "P_IT_W",
+      "E_HVAC_J",
+      "E_IT_J",
+      "free_cooling_s",
+      "partial_mechanical_s",
+      "full_mechanical_s",
+      "mode_switches"
+    ],
+    "parameters": {
+      "Q_room": {
+        "default": 500000,
+        "min": 300000,
+        "max": 700000,
+        "unit": "W",
+        "description": "Computer-room internal heat gain"
+      },
+      "T_room_set": {
+        "default": 298.15,
+        "min": 295.15,
+        "max": 301.15,
+        "unit": "K",
+        "description": "Room air temperature setpoint"
+      },
+      "T_sup_set": {
+        "default": 291.13,
+        "min": 288.15,
+        "max": 294.15,
+        "unit": "K",
+        "description": "Supply-air temperature setpoint"
+      }
+    },
+    "operating_range": {
+      "Q_room": {
+        "min": 400000,
+        "max": 600000,
+        "unit": "W"
+      },
+      "T_room_set": {
+        "min": 296.15,
+        "max": 300.15,
+        "unit": "K"
+      },
+      "T_sup_set": {
+        "min": 289.15,
+        "max": 293.15,
+        "unit": "K"
+      },
+      "T_room_K": {
+        "min": 288.15,
+        "max": 318.15,
+        "unit": "K"
+      },
+      "P_HVAC_W": {
+        "min": 0,
+        "max": 2000000,
+        "unit": "W"
+      }
+    },
+    "limitations": [
+      "Library regression validation does not constitute calibration against a physical facility.",
+      "The benchmark is fixed to the Chicago-OHare TMY3 profile over the upstream mid-May window (t = 1.188e7 s to 1.26e7 s); results are seasonal and not annual.",
+      "Upstream agreement on the DX coil signals requires a fine output grid. At the registered 14400 intervals (50 s) the worst normalized RMSE is 4.2e-05; at 1000 s sampling the same run aliases coil stage transitions and exceeds the 0.005 tolerance.",
+      "The room is the Buildings SimplifiedRoom lumped volume, so there are no rack-level hot spots, containment effects, or airflow-network detail.",
       "Results are valid only for the pinned Buildings and OpenModelica versions."
     ]
   }

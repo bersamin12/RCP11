@@ -679,54 +679,6 @@ export interface AnnotationDraft {
   anchor?: PdfSelectionAnchor | null;
 }
 
-/* ---------- evaluation rubric (docs/EVALUATION.md) ---------- */
-
-export type RubricScore = 1 | 2 | 3 | 4 | 5;
-
-export interface DimensionSummary {
-  dimension: string;
-  n: number;
-  minimum: number;
-  median: number;
-  maximum: number;
-  disagreement: boolean;
-}
-
-/** Deliberately carries no total, mean, or composite: EVALUATION.md forbids one. */
-export interface RubricSummary {
-  run_id: string;
-  reviewer_count: number;
-  condition: "platform" | "baseline";
-  dimensions: DimensionSummary[];
-  verification_time_seconds: number[];
-  disagreement_dimensions: string[];
-  generated_at: string;
-}
-
-export interface EvaluationScorecard {
-  id: string;
-  run_id: string;
-  reviewer_id: string;
-  condition: "platform" | "baseline";
-  blinded: boolean;
-  self_evaluated: boolean;
-  verification_time_seconds: number | null;
-  challenged_claim_id: string;
-  observations: string;
-  created_at: string;
-}
-
-export interface EvaluationView {
-  count: number;
-  min_reviewers: number;
-  revealed: boolean;
-  reviewer_ids: string[];
-  scorecards: EvaluationScorecard[];
-  summary: RubricSummary | null;
-  dimensions: string[];
-  blinding_note: string;
-}
-
 /* ---------- full-text re-extraction ---------- */
 
 export interface FullTextExtraction {

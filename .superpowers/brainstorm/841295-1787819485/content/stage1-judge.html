@@ -1,0 +1,89 @@
+<h2>The judge step</h2>
+<p class="subtitle">Deciding whether a paper is about your topic. This is the step that decides everything downstream.</p>
+
+<div class="mockup">
+  <div class="mockup-header" style="color:var(--error)">What <code>screen_relevant()</code> does today</div>
+  <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.8">
+    It pastes the <strong>titles</strong> of the first 40 papers into one prompt and asks which numbers are relevant.<br><br>
+    &bull; It never sees the abstract. A title like <em>&ldquo;Towards greener infrastructure&rdquo;</em> is unjudgeable.<br>
+    &bull; Everything past the 40th paper is silently ignored.<br>
+    &bull; All 40 are judged together, so they affect each other, and one wrong index number quietly deletes the wrong paper.<br>
+    &bull; No reason is recorded. A dropped paper leaves no trace at all.<br>
+    &bull; If the AI call fails it keeps everything; if the AI returns nothing it also keeps everything. Two very different situations, same result.<br>
+    &bull; It is told to be <strong>strict</strong>. For gap finding that is backwards &mdash; see below.
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">What it should do &mdash; cheap first, AI only where it is needed</div>
+  <div class="mockup-body" style="padding:20px">
+
+    <div style="display:flex;align-items:stretch;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:190px;padding:14px;border-radius:8px;background:var(--bg-tertiary);border:1.5px solid var(--border)">
+        <div style="font-weight:600;margin-bottom:6px">Step 1 &mdash; free sort</div>
+        <div style="font-size:13px;line-height:1.65;color:var(--text-secondary)">Score every paper against the topic by meaning, on your own machine. No AI call, no cost.<br><br>Clearly unrelated ones are dropped here. Hundreds of papers, seconds, nothing spent.</div>
+      </div>
+      <div style="flex:1;min-width:190px;padding:14px;border-radius:8px;background:var(--selected-bg);border:1.5px solid var(--accent)">
+        <div style="font-weight:600;margin-bottom:6px">Step 2 &mdash; AI reads the unsure middle</div>
+        <div style="font-size:13px;line-height:1.65;color:var(--text-secondary)">Only papers in the grey band get an AI call. <strong>One paper per call</strong>, title and abstract, so papers cannot affect each other.<br><br>It answers a fixed checklist, not a vibe.</div>
+      </div>
+      <div style="flex:1;min-width:190px;padding:14px;border-radius:8px;background:var(--bg-tertiary);border:1.5px solid var(--border)">
+        <div style="font-weight:600;margin-bottom:6px">Step 3 &mdash; three outcomes</div>
+        <div style="font-size:13px;line-height:1.65;color:var(--text-secondary)"><strong style="color:var(--success)">Keep</strong> &mdash; into the pile, and we follow its references<br><strong style="color:var(--error)">Drop</strong> &mdash; with a written reason, kept on record<br><strong style="color:var(--warning)">Unsure</strong> &mdash; goes to you at the approval gate</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">The checklist &mdash; written before the run starts, same for every paper</div>
+  <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.9">
+    <strong>1. Subject.</strong> Is it about data centre or server room cooling and thermal behaviour?<br>
+    <strong>2. Type.</strong> Does it report a measurement, experiment, simulation or model? <span style="color:var(--text-secondary)">(drops opinion pieces and marketing)</span><br>
+    <strong>3. Outcome.</strong> Does it report something we care about &mdash; energy, PUE, temperature, cost?<br>
+    <strong>4. Overlap.</strong> Is it the same work as a paper we already hold, in a longer or shorter form?<br><br>
+    <span style="color:var(--text-secondary)">Each answer is yes, no, or cannot tell from the abstract &mdash; recorded separately. That is the difference between &ldquo;the AI said no&rdquo; and &ldquo;it failed on question 2, and here is the sentence it used&rdquo;.</span>
+  </div>
+</div>
+
+<div class="split" style="margin-top:20px">
+  <div class="mockup">
+    <div class="mockup-header">Three worked examples</div>
+    <div class="mockup-body" style="padding:0;font-size:13px">
+      <div style="padding:13px 15px;border-bottom:1px solid var(--border)">
+        <div style="font-style:italic;margin-bottom:5px">&ldquo;Rear-door heat exchangers in a 400 kW server room&rdquo;</div>
+        <div style="color:var(--text-secondary)">meaning score 0.71 &rarr; grey band &rarr; AI reads it<br>subject yes · type yes · outcome yes · overlap no</div>
+        <div style="color:var(--success);font-weight:600;margin-top:4px">KEEP &mdash; and follow its references</div>
+      </div>
+      <div style="padding:13px 15px;border-bottom:1px solid var(--border)">
+        <div style="font-style:italic;margin-bottom:5px">&ldquo;Thermal management of EV battery packs&rdquo;</div>
+        <div style="color:var(--text-secondary)">meaning score 0.34 &rarr; below the floor</div>
+        <div style="color:var(--error);font-weight:600;margin-top:4px">DROP &mdash; no AI call spent, reason recorded</div>
+      </div>
+      <div style="padding:13px 15px">
+        <div style="font-style:italic;margin-bottom:5px">&ldquo;Towards greener infrastructure&rdquo; <span style="color:var(--text-tertiary)">(no abstract)</span></div>
+        <div style="color:var(--text-secondary)">nothing to judge on</div>
+        <div style="color:var(--warning);font-weight:600;margin-top:4px">UNSURE &mdash; you decide at the gate</div>
+      </div>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header" style="color:var(--warning)">Lean towards keeping. Here is why.</div>
+    <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.75">
+      <p style="margin:0 0 12px">Keeping a junk paper costs a fraction of a cent and some noise.</p>
+      <p style="margin:0 0 12px"><strong>Dropping a good paper creates a fake gap.</strong> Stage 2 will announce nobody has done something that somebody has already published.</p>
+      <p style="margin:0 0 12px">And it is worse than losing one paper &mdash; we only follow references from papers we kept. Drop one, and you lose everything it cites and everything citing it. One mistake removes a whole branch.</p>
+      <p style="margin:0;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:11px">So the checklist is set to keep anything it cannot confidently rule out. The word <strong>strict</strong> comes out of the prompt.</p>
+    </div>
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">How do we know the judge is any good?</div>
+  <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.8">
+    <strong>Once:</strong> your team labels 50 papers by hand &mdash; keep or drop. That set never changes. Every time the judge changes, run it against those 50. You get a real number instead of a feeling.<br><br>
+    <strong>Every run, free:</strong> count how many papers the judge dropped that you put back at the approval gate. That is the number that matters, because those are the fake gaps you were about to be handed.<br><br>
+    <span style="color:var(--text-secondary)">Both numbers are also what the system tunes itself on later &mdash; the answer key you produce just by using it.</span>
+  </div>
+</div>

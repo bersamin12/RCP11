@@ -986,6 +986,9 @@ def models():
             "libraries": m.libraries,
             "source": m.source,
             "metric_profile": m.metric_profile,
+            "default_start_time": m.default_start_time,
+            "default_stop_time": m.default_stop_time,
+            "default_intervals": m.default_intervals,
         }
         for name, m in load_registry().items()
     }
@@ -1011,7 +1014,9 @@ def quick_simulate(body: SimRequest):
         model_name=body.model_name,
         parameters=body.parameters,
         outputs=info.outputs,
+        start_time=info.default_start_time,
         stop_time=body.stop_time or info.default_stop_time,
+        intervals=info.default_intervals,
     )
     workdir = data_dir() / "runs" / spec.id
     try:

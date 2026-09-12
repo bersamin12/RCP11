@@ -1,0 +1,105 @@
+<h2>Stage 1 — Gap Discovery &amp; Mining</h2>
+<p class="subtitle">In: research topic + triaged corpus. Out: a validated, ranked gap set. No hypotheses. No model registry anywhere in this stage.</p>
+
+<div class="section" style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;margin-bottom:18px">
+  <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--bg-tertiary);border:1.5px solid var(--border);vertical-align:-2px"></span> deterministic Python</span>
+  <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--selected-bg);border:1.5px solid var(--accent);vertical-align:-2px"></span> pi agent session</span>
+  <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:transparent;border:1.5px solid var(--error);vertical-align:-2px"></span> adversarial refuter</span>
+  <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:transparent;border:1.5px solid var(--warning);vertical-align:-2px"></span> human gate</span>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">LangGraph subgraph — every box is a node, every arrow an edge, every node boundary is a checkpoint</div>
+  <div class="mockup-body" style="padding:22px">
+
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+      <div style="padding:9px 13px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px">
+        <strong>freeze_corpus</strong><br><span style="color:var(--text-secondary);font-size:11.5px">eligible cards, findings index,<br>corpus manifest hash</span>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:19px">&rarr;</span>
+      <div style="padding:9px 13px;border-radius:7px;background:var(--selected-bg);border:1.5px solid var(--accent);font-size:13px">
+        <strong>seed_gaps</strong><br><span style="color:var(--text-secondary);font-size:11.5px">candidate gaps from findings<br>&amp; stated limitations &rarr; tree roots</span>
+      </div>
+    </div>
+
+    <div style="border:2px dashed var(--accent);border-radius:11px;padding:16px;margin-bottom:18px;position:relative">
+      <div class="label" style="position:absolute;top:-9px;left:14px;background:var(--bg-secondary);padding:0 7px;color:var(--accent)">MCTS loop over gap space</div>
+
+      <div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <div style="flex:1;min-width:120px;padding:9px 11px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:12.5px">
+          <strong>select</strong><br><span style="color:var(--text-secondary);font-size:11px">UCT descent<br>over the tree</span>
+        </div>
+        <span style="align-self:center;color:var(--text-tertiary)">&rarr;</span>
+        <div style="flex:1.5;min-width:170px;padding:9px 11px;border-radius:7px;background:var(--selected-bg);border:1.5px solid var(--accent);font-size:12.5px">
+          <strong>expand</strong><br><span style="color:var(--text-secondary);font-size:11px">agent applies one action:<br><code style="font-size:10.5px">specialize · generalize · split · merge · ground&nbsp;(fetch&nbsp;full&nbsp;text) · reframe-from-conflict</code></span>
+        </div>
+        <span style="align-self:center;color:var(--text-tertiary)">&rarr;</span>
+        <div style="flex:1.7;min-width:180px;padding:9px 11px;border-radius:7px;background:var(--bg-secondary);border:1.5px solid var(--error);font-size:12.5px">
+          <strong>evaluate</strong><br><span style="color:var(--text-secondary);font-size:11px">validators + <strong style="color:var(--error)">refuter</strong> + judge panel<br>&rarr; reward vector</span>
+        </div>
+        <span style="align-self:center;color:var(--text-tertiary)">&rarr;</span>
+        <div style="flex:1;min-width:120px;padding:9px 11px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:12.5px">
+          <strong>backprop</strong><br><span style="color:var(--text-secondary);font-size:11px">visits, value,<br>reward terms</span>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--text-tertiary);font-size:12px;margin-top:11px;border-top:1px dashed var(--border);padding-top:9px">
+        &#8629; repeat until budget spent or top-K value stops improving &nbsp;·&nbsp; <strong>each iteration is its own checkpoint — kill it and resume mid-search</strong>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="padding:9px 13px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px">
+        <strong>harvest</strong><br><span style="color:var(--text-secondary);font-size:11.5px">top-K by value,<br>diversity-constrained</span>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:19px">&rarr;</span>
+      <div style="padding:9px 13px;border-radius:7px;background:var(--selected-bg);border:1.5px solid var(--accent);font-size:13px">
+        <strong>conflicts</strong><br><span style="color:var(--text-secondary);font-size:11.5px">contradiction vs tension<br><code style="font-size:10.5px">_opposing_findings()</code> retained</span>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:19px">&rarr;</span>
+      <div style="padding:9px 13px;border-radius:7px;background:transparent;border:1.5px solid var(--warning);font-size:13px">
+        <strong>human gate</strong><br><span style="color:var(--text-secondary);font-size:11.5px">approve · edit · send back<br>to search with feedback</span>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:19px">&rarr;</span>
+      <div style="padding:9px 13px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px">
+        <strong>emit</strong><br><span style="color:var(--text-secondary);font-size:11.5px">ResearchSynthesis +<br>validation record + edges</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="split" style="margin-top:20px">
+  <div class="mockup">
+    <div class="mockup-header">Reward vector at <code>evaluate</code></div>
+    <div class="mockup-body" style="padding:15px;font-size:12.5px;line-height:1.75">
+      <div style="color:var(--error);font-weight:600;margin-bottom:3px">hard — non-compensatory, kills the node</div>
+      cites a paper / finding ID not in the frozen corpus<br>
+      <strong>refuter found a paper that already fills it</strong><br><br>
+      <div style="color:var(--warning);font-weight:600;margin-bottom:3px">soft penalties</div>
+      near-duplicate of an expanded node (embedding)<br>
+      overclaimed contradiction, demoted to tension<br>
+      unfalsifiable or untestable-in-principle phrasing<br><br>
+      <div style="color:var(--success);font-weight:600;margin-bottom:3px">positive</div>
+      evidence grounding — findings, papers, mean <code>selection_score</code><br>
+      specificity — named intervention, outcome, conditions<br>
+      judge panel — novelty, interest <span style="color:var(--text-secondary)">(rationale recorded)</span>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Removed from today's gap miner</div>
+    <div class="mockup-body" style="padding:15px;font-size:12.5px;line-height:1.75">
+      <code style="font-size:11px">valid_models = sorted(load_registry())</code> — gone from the prompt<br><br>
+      <code style="font-size:11px">"Use only listed Modelica model names"</code> — gone<br><br>
+      <code style="font-size:11px">model_names filtered to registry</code> — gone<br><br>
+      <code style="font-size:11px">_fallback_gaps(... model_names=valid_models[:1])</code> — gone<br><br>
+      <div style="border-top:1px solid var(--border);padding-top:11px;margin-top:5px">
+        <strong>Replaced by</strong> <code style="font-size:11px">required_capability</code>: free text describing the simulation capability the gap <em>would</em> need. Not checked against anything. Becomes the queue that feeds the model-authoring stage.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:18px;padding:13px 15px;border-left:3px solid var(--accent);background:var(--bg-secondary);border-radius:0 7px 7px 0;font-size:13px;line-height:1.65">
+  <strong>The deferred-reward seam.</strong> Nothing here can see a simulator. But <code>emit</code> writes provenance edges, so when a gap eventually becomes a hypothesis, a spec, and a run — stages 2&ndash;4, months later — the outcome traverses back to <em>this</em> node and <em>this</em> agent variant. That backfilled signal is what RSI hill-climbs. Stage 1 is built to receive it without being blocked on it.
+</div>

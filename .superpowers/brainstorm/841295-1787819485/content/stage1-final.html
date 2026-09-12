@@ -1,0 +1,87 @@
+<h2>Stage 1 &mdash; the whole thing</h2>
+<p class="subtitle">Everything we have agreed, in one place. Nothing about Modelica appears anywhere in this stage.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header" style="color:var(--success)">Stage 1 does</div>
+    <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.9">
+      find real, peer-reviewed papers on a topic<br>
+      check they exist and are not withdrawn<br>
+      follow references outward until the search dries up<br>
+      read the best ones and record what they found<br>
+      build the citation web and the summaries<br>
+      let you approve the final list<br>
+      freeze it so it cannot change later
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header" style="color:var(--error)">Stage 1 does not</div>
+    <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.9">
+      look for gaps &nbsp;<span style="color:var(--text-tertiary)">&mdash; stage 2</span><br>
+      write hypotheses &nbsp;<span style="color:var(--text-tertiary)">&mdash; stage 2</span><br>
+      know which Modelica models exist &nbsp;<span style="color:var(--text-tertiary)">&mdash; never</span><br>
+      collect parameters for building models &nbsp;<span style="color:var(--text-tertiary)">&mdash; separate stage</span><br>
+      run anything
+    </div>
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">The run, start to finish</div>
+  <div class="mockup-body" style="padding:20px;font-size:13.5px;line-height:1.85">
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:11px 15px;align-items:start">
+      <strong style="color:var(--accent)">seed</strong>
+      <div>Start from a survey paper if you have one, or from written queries if not. Its reference list is the first batch.</div>
+
+      <strong style="color:var(--accent)">search</strong>
+      <div>OpenAlex and Semantic Scholar, several queries at once.</div>
+
+      <strong>merge</strong>
+      <div>Join duplicates by DOI, then by title. Already built.</div>
+
+      <strong>check</strong>
+      <div>Real venue, confirmed twice. Not retracted. Not an editorial. If it looks like a preprint, go find the published version and use that instead.</div>
+
+      <strong style="color:var(--accent)">judge</strong>
+      <div>Match on meaning, not shared words. A cheap model reads the abstract and says keep or drop, with a reason.</div>
+
+      <strong>follow</strong>
+      <div>From the papers that were kept, pull what they cite and who cites them. Back to <em>merge</em>.</div>
+
+      <strong>stop?</strong>
+      <div>If a whole round mostly returned papers we already had, stop. Otherwise go again on the part that looks thin.</div>
+
+      <strong style="color:var(--accent)">read</strong>
+      <div>The best ~20. Full PDF where the licence allows it, abstract otherwise. Record which one it was for every single fact.</div>
+
+      <strong>organise</strong>
+      <div>Citation web, the findings as linked facts, and grouped summaries so it fits in context later.</div>
+
+      <strong style="color:var(--warning)">approve</strong>
+      <div>You see the list, add or remove papers. What you change is recorded &mdash; that is the answer key the system learns from.</div>
+
+      <strong>freeze</strong>
+      <div>Locked list with a fingerprint. Stage 2 can only ever see this.</div>
+    </div>
+  </div>
+</div>
+
+<div class="split" style="margin-top:20px">
+  <div class="mockup">
+    <div class="mockup-header">What comes out</div>
+    <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.85">
+      <strong>Core pile</strong> &mdash; ~20 papers, read properly, findings recorded with the sentence they came from<br>
+      <strong>Wide pile</strong> &mdash; a few hundred, title and abstract only<br>
+      <strong>Citation web</strong> &mdash; who cites whom, exact<br>
+      <strong>Summaries</strong> &mdash; grouped, so a wide question does not need 300 papers<br>
+      <strong>A record of the run</strong> &mdash; queries tried, what was dropped and why, what you changed
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">An honest limit</div>
+    <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.75">
+      <p style="margin:0 0 11px">We can only download a paper when its licence clearly allows it. Your <code>acquire.py</code> is strict about this on purpose, and that is the right call.</p>
+      <p style="margin:0">So some of the best papers will only ever be read as an abstract. Every fact records which it was, so nobody can later mistake a guess from an abstract for something read on page 7.</p>
+    </div>
+  </div>
+</div>

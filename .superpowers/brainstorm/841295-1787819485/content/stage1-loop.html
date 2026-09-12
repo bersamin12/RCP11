@@ -1,0 +1,101 @@
+<h2>Where the loop is, and when it stops</h2>
+
+<div class="section" style="display:flex;gap:20px;flex-wrap:wrap;font-size:13px;margin-bottom:16px">
+  <span><span style="display:inline-block;width:13px;height:13px;border-radius:3px;background:var(--bg-tertiary);border:1.5px solid var(--border);vertical-align:-2px"></span> plain code &mdash; no AI, same answer every time</span>
+  <span><span style="display:inline-block;width:13px;height:13px;border-radius:3px;background:var(--selected-bg);border:1.5px solid var(--accent);vertical-align:-2px"></span> an AI does this</span>
+  <span><span style="display:inline-block;width:13px;height:13px;border-radius:3px;background:transparent;border:1.5px solid var(--warning);vertical-align:-2px"></span> you do this</span>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">The loop runs a few times. Each pass is one round.</div>
+  <div class="mockup-body" style="padding:22px">
+
+    <div style="border:2px dashed var(--accent);border-radius:11px;padding:18px 16px 14px;position:relative">
+      <div class="label" style="position:absolute;top:-9px;left:16px;background:var(--bg-secondary);padding:0 8px;color:var(--accent)">one round</div>
+
+      <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center">
+        <div style="padding:11px 12px;border-radius:7px;background:var(--selected-bg);border:1.5px solid var(--accent);font-size:13px;text-align:center;min-width:96px"><strong>plan</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">write queries</span></div>
+        <span style="color:var(--text-tertiary)">&rarr;</span>
+        <div style="padding:11px 12px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px;text-align:center;min-width:96px"><strong>search</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">two APIs</span></div>
+        <span style="color:var(--text-tertiary)">&rarr;</span>
+        <div style="padding:11px 12px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px;text-align:center;min-width:96px"><strong>merge</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">kill duplicates</span></div>
+        <span style="color:var(--text-tertiary)">&rarr;</span>
+        <div style="padding:11px 12px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px;text-align:center;min-width:96px"><strong>check</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">real? withdrawn?</span></div>
+        <span style="color:var(--text-tertiary)">&rarr;</span>
+        <div style="padding:11px 12px;border-radius:7px;background:var(--selected-bg);border:1.5px solid var(--accent);font-size:13px;text-align:center;min-width:96px"><strong>judge</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">keep or drop</span></div>
+        <span style="color:var(--text-tertiary)">&rarr;</span>
+        <div style="padding:11px 12px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px;text-align:center;min-width:96px"><strong>follow</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">refs + citers</span></div>
+        <span style="color:var(--text-tertiary)">&rarr;</span>
+        <div style="padding:11px 12px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px;text-align:center;min-width:96px"><strong>measure</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">3 numbers</span></div>
+      </div>
+
+      <div style="text-align:center;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);font-size:13px">
+        <span style="color:var(--text-secondary)">&#8630; still finding things &rarr;</span> <strong style="color:var(--accent)">go round again, aimed at the thin part</strong>
+      </div>
+    </div>
+
+    <div style="text-align:center;color:var(--text-tertiary);font-size:20px;margin:12px 0 10px">&darr; dried up &darr;</div>
+
+    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center">
+      <div style="padding:11px 12px;border-radius:7px;background:var(--selected-bg);border:1.5px solid var(--accent);font-size:13px;text-align:center;min-width:110px"><strong>read</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">the best ~20</span></div>
+      <span style="color:var(--text-tertiary)">&rarr;</span>
+      <div style="padding:11px 12px;border-radius:7px;background:var(--selected-bg);border:1.5px solid var(--accent);font-size:13px;text-align:center;min-width:110px"><strong>organise</strong><br><span style="font-size:11.5px;color:var(--text-secondary)">web + summaries</span></div>
+      <span style="color:var(--text-tertiary)">&rarr;</span>
+      <div style="padding:11px 12px;border-radius:7px;background:transparent;border:1.5px solid var(--warning);font-size:13px;text-align:center;min-width:110px"><strong>you approve</strong></div>
+      <span style="color:var(--text-tertiary)">&rarr;</span>
+      <div style="padding:11px 12px;border-radius:7px;background:var(--bg-tertiary);border:1.5px solid var(--border);font-size:13px;text-align:center;min-width:110px"><strong>freeze</strong></div>
+    </div>
+
+    <div style="margin-top:16px;padding:12px 14px;background:var(--bg-tertiary);border-radius:8px;font-size:13px;line-height:1.7">
+      <strong>To answer your question directly:</strong> the loop is the <em>whole round</em>, not any one box. No box loops inside itself. Each box runs once, finishes, and gets saved &mdash; so you can kill the run at any point and it picks up from the last box, not the start.<br>
+      <span style="color:var(--text-secondary)">The AI searching in circles by itself comes in stage 2. Here the loop is plain code deciding whether to go again.</span>
+    </div>
+
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">The three numbers measured at the end of every round</div>
+  <div class="mockup-body" style="padding:0">
+
+    <div style="padding:16px;border-bottom:1px solid var(--border)">
+      <div style="font-size:14px;font-weight:600;margin-bottom:5px">1. Is it still finding anything useful?</div>
+      <div style="font-size:13.5px;line-height:1.7">
+        Of everything this round pulled in: how many were <strong>new</strong> <em>and</em> <strong>passed the judge</strong>?<br>
+        <span style="color:var(--text-secondary)">300 new papers that all get dropped is not progress. Counting only the ones we keep stops that from looking like success.</span><br>
+        <span style="color:var(--accent)">Stop when this falls below about 5%, two rounds in a row.</span> Two rounds, not one, so a single bad set of queries does not end the search.
+      </div>
+    </div>
+
+    <div style="padding:16px;border-bottom:1px solid var(--border)">
+      <div style="font-size:14px;font-weight:600;margin-bottom:5px">2. Have we closed the web?</div>
+      <div style="font-size:13.5px;line-height:1.7">
+        Take the papers we are keeping. List everything they cite. How much of that list do we already have?<br>
+        <span style="color:var(--text-secondary)">If our best papers keep citing things we have never fetched, the search is not finished, no matter what the queries return.</span><br>
+        <span style="color:var(--accent)">Stop when we hold about 90% of what our kept papers cite.</span>
+      </div>
+    </div>
+
+    <div style="padding:16px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:5px">3. How much are we missing? &nbsp;<span style="font-size:12px;color:var(--success);font-weight:400">&mdash; the useful one</span></div>
+      <div style="font-size:13.5px;line-height:1.7">
+        Before starting, secretly set aside 5 or 10 papers you know are relevant. Never seed with them. At the end, check how many the search found on its own.<br>
+        <span style="color:var(--text-secondary)">Found 9 of 10 &rarr; you can say the search finds roughly 90% of what is out there. Found 4 of 10 &rarr; any gap it reports is worthless, and you know it before you build anything on top.</span><br>
+        <span style="color:var(--success)">This does not stop the loop. It tells you whether to trust the result at all.</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">&ldquo;Go again on the part that looks thin&rdquo; &mdash; what thin means</div>
+  <div class="mockup-body" style="padding:16px;font-size:13.5px;line-height:1.8">
+    We group the papers we have by subject &mdash; the same grouping used for summaries. Then a region is <strong>thin</strong> if any of these is true:<br><br>
+    &bull; a group has few papers but the ones in it scored highly<br>
+    &bull; a group's papers cite lots of things we have not fetched<br>
+    &bull; a time period is nearly empty &mdash; usually the last two years, because keyword search favours well-cited older work<br>
+    &bull; a survey's own section headings have almost no matching papers on our side<br><br>
+    <span style="color:var(--text-secondary)">The thin region is then handed to <strong>plan</strong> as the target for the next round's queries. That is the actual feedback in this loop &mdash; what we failed to find last round decides what we search for next round.</span>
+  </div>
+</div>

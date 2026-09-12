@@ -13,6 +13,8 @@ PROFILE_METRICS = {
         "free_cooling_hours", "partial_mechanical_hours", "full_mechanical_hours", "mode_switches",
     },
 }
+# The air-cooled DX benchmark reports the same PostProcess signal group.
+PROFILE_METRICS["dx_benchmark"] = PROFILE_METRICS["chiller_benchmark"]
 
 
 def _key(value: str) -> str:

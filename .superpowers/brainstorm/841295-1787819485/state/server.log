@@ -1,0 +1,10 @@
+{"type":"server-started","port":51059,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:51059/?key=ed444f78409ff4c57910cf89e65607c7958d50592c06b1f03d97ac5cda386502","screen_dir":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content","state_dir":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/state","idle_timeout_ms":14400000}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/stage1-topology.html"}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/stage1-simple.html"}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/stage1-literature.html"}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/stage1-fixes.html"}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/graph-layers.html"}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/stage1-final.html"}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/stage1-loop.html"}
+{"type":"screen-added","file":"/mnt/berstorage/RCP/rcp-platform/.superpowers/brainstorm/841295-1787819485/content/stage1-judge.html"}
+{"type":"server-stopped","reason":"owner process exited"}

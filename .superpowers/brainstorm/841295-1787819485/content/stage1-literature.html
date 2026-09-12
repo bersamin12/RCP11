@@ -1,0 +1,85 @@
+<h2>Stage 1 — Literature search</h2>
+<p class="subtitle">A topic goes in. A locked set of real, peer-reviewed papers comes out. Stage 2 then looks for gaps in it.</p>
+
+<div class="mockup">
+  <div class="mockup-header">The loop</div>
+  <div class="mockup-body" style="padding:24px">
+
+    <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;justify-content:center;margin-bottom:18px">
+      <div style="padding:14px 12px;border-radius:8px;background:var(--selected-bg);border:1.5px solid var(--accent);text-align:center;min-width:118px">
+        <div style="font-weight:600;font-size:14px">Ask</div>
+        <div style="color:var(--text-secondary);font-size:12px">write several<br>search queries</div>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:21px">&rarr;</span>
+      <div style="padding:14px 12px;border-radius:8px;background:var(--bg-tertiary);border:1.5px solid var(--border);text-align:center;min-width:118px">
+        <div style="font-weight:600;font-size:14px">Search</div>
+        <div style="color:var(--text-secondary);font-size:12px">OpenAlex,<br>Semantic Scholar</div>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:21px">&rarr;</span>
+      <div style="padding:14px 12px;border-radius:8px;background:var(--bg-tertiary);border:1.5px solid var(--border);text-align:center;min-width:118px">
+        <div style="font-weight:600;font-size:14px">Check</div>
+        <div style="color:var(--text-secondary);font-size:12px">is it real, reviewed,<br>not retracted</div>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:21px">&rarr;</span>
+      <div style="padding:14px 12px;border-radius:8px;background:var(--selected-bg);border:1.5px solid var(--accent);text-align:center;min-width:118px">
+        <div style="font-weight:600;font-size:14px">Judge</div>
+        <div style="color:var(--text-secondary);font-size:12px">is it actually<br>about the topic</div>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:21px">&rarr;</span>
+      <div style="padding:14px 12px;border-radius:8px;background:var(--bg-tertiary);border:1.5px solid var(--border);text-align:center;min-width:118px">
+        <div style="font-weight:600;font-size:14px">Follow</div>
+        <div style="color:var(--text-secondary);font-size:12px">papers it cites,<br>papers citing it</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:14px;border:2px dashed var(--accent);border-radius:9px;font-size:13.5px">
+      <strong>Enough yet?</strong> &nbsp; If the last round mostly found papers we already had, stop. &nbsp;
+      <span style="color:var(--text-secondary)">Otherwise go back to <strong>Ask</strong> and search the part we are missing.</span>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;justify-content:center;margin-top:18px">
+      <div style="padding:14px 12px;border-radius:8px;background:transparent;border:1.5px solid var(--warning);text-align:center;min-width:150px">
+        <div style="font-weight:600;font-size:14px">You approve</div>
+        <div style="color:var(--text-secondary);font-size:12px">add or remove papers</div>
+      </div>
+      <span style="color:var(--text-tertiary);font-size:21px">&rarr;</span>
+      <div style="padding:14px 12px;border-radius:8px;background:var(--bg-tertiary);border:1.5px solid var(--border);text-align:center;min-width:150px">
+        <div style="font-weight:600;font-size:14px">Lock it</div>
+        <div style="color:var(--text-secondary);font-size:12px">frozen list, cannot change later</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="split" style="margin-top:20px">
+  <div class="mockup">
+    <div class="mockup-header">Two piles, not one</div>
+    <div class="mockup-body" style="padding:18px;font-size:13.5px;line-height:1.8">
+      <p style="margin:0 0 10px"><strong>Core pile &mdash; about 20 papers.</strong> The best ones. We download the PDF and read them properly.</p>
+      <p style="margin:0 0 14px"><strong>Wide pile &mdash; a few hundred.</strong> Title and abstract only. Never read in full.</p>
+      <p style="margin:0;color:var(--text-secondary);border-top:1px solid var(--border);padding-top:12px">Stage 2 needs both. The core pile is where ideas come from. The wide pile is what proves an idea has already been done.</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">What &ldquo;top&rdquo; means</div>
+    <div class="mockup-body" style="padding:18px;font-size:13.5px;line-height:1.95">
+      <span style="color:var(--success);font-weight:600">Must have</span> &mdash; a real journal or conference, confirmed in two places<br>
+      <span style="color:var(--success);font-weight:600">Must have</span> &mdash; not retracted<br>
+      <span style="color:var(--text-secondary)">Helps</span> &mdash; well-known venue in this field<br>
+      <span style="color:var(--text-secondary)">Helps</span> &mdash; cited often for its age and field<br>
+      <span style="color:var(--text-secondary)">Helps</span> &mdash; recent<br>
+      <span style="color:var(--text-secondary)">Helps</span> &mdash; the full text is free to read
+    </div>
+  </div>
+</div>
+
+<div class="mockup" style="margin-top:20px">
+  <div class="mockup-header">Four things to fix in what you have now</div>
+  <div class="mockup-body" style="padding:18px;font-size:13.5px;line-height:1.75">
+    <p style="margin:0 0 12px"><strong>1. Matching is done by counting shared words.</strong> A paper about &ldquo;server room chilled water&rdquo; will not match a topic written as &ldquo;data centre cooling&rdquo;. This is half the score right now. Use meaning-based matching instead.</p>
+    <p style="margin:0 0 12px"><strong>2. It never follows references.</strong> This is the biggest miss. The fastest way to find the right papers is to look at what a good paper cites, and who cites it. Both sources give you this for free.</p>
+    <p style="margin:0 0 12px"><strong>3. It does not check for retractions.</strong> A withdrawn paper could quietly become the basis of a research gap.</p>
+    <p style="margin:0"><strong>4. It punishes preprints even when they were later published.</strong> An arXiv paper that came out in a journal two years later should count as the journal version.</p>
+  </div>
+</div>

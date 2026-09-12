@@ -277,6 +277,7 @@ class ExperimentSpec(BaseModel):
     model_name: str
     parameters: dict[str, float] = Field(default_factory=dict)
     outputs: list[str] = Field(default_factory=list)
+    start_time: float = 0.0
     stop_time: float = 86400.0
     intervals: int = 500
     description: str = ""
@@ -291,6 +292,7 @@ class ExperimentCase(BaseModel):
     model_name: str
     parameters: dict[str, float] = Field(default_factory=dict)
     outputs: list[str] = Field(default_factory=list)
+    start_time: float = 0.0
     stop_time: float = 86400.0
     intervals: int = 1440
     factor_values: dict[str, float] = Field(default_factory=dict)

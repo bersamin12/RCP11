@@ -52,7 +52,8 @@ def _simulate_cmd(model: ModelInfo, spec: ExperimentSpec) -> str:
     overrides = ",".join(f"{k}={v}" for k, v in spec.parameters.items())
     simflags = f', simflags="-override {overrides}"' if overrides else ""
     return (
-        f"simulate({model.class_name}, stopTime={spec.stop_time}, "
+        f"simulate({model.class_name}, startTime={spec.start_time}, "
+        f"stopTime={spec.stop_time}, "
         f'numberOfIntervals={spec.intervals}, outputFormat="csv", '
         f'fileNamePrefix="result"{simflags})'
     )
@@ -66,7 +67,8 @@ def _write_mos(spec: ExperimentSpec, workdir: Path) -> Path:
     mos = (
         library_loads
         + f'loadFile("{model.file}"); getErrorString();\n'
-        f"simulate({model.class_name}, stopTime={spec.stop_time}, "
+        f"simulate({model.class_name}, startTime={spec.start_time}, "
+        f"stopTime={spec.stop_time}, "
         f'numberOfIntervals={spec.intervals}, outputFormat="csv", fileNamePrefix="result"{simflags}); '
         "getErrorString();\n"
     )

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   MemoryDetail, MemoryTopic, ModelValidationReport, Registry, ReportDocument, ReportRevision,
-  AnalysisRevision, AnnotationDraft, EvaluationScorecard, EvaluationView, EvidenceAnnotation,
+  AnalysisRevision, AnnotationDraft, EvidenceAnnotation,
   ExperimentResultSet, FullTextExtraction, PdfAsset, ProtocolChanges, ReportValidation, ResearchLineage, ResearchReview, ResearchReviewDecision, ResearchSynthesis, ResultBundle, RunManifest, RunRecord, Series, ThesisIdea, ThesisProfile,
 } from "./types";
 
@@ -120,15 +120,6 @@ export const api = {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resolution_note, author }),
     }).then((r) => json<EvidenceAnnotation>(r)),
-  evaluation: (id: string, reviewerId?: string, condition = "platform") => {
-    const query = new URLSearchParams({ condition });
-    if (reviewerId) query.set("reviewer_id", reviewerId);
-    return fetch(`/api/runs/${id}/evaluation?${query}`).then((r) => json<EvaluationView>(r));
-  },
-  submitScorecard: (id: string, body: Record<string, unknown>) =>
-    fetch(`/api/runs/${id}/evaluation`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    }).then((r) => json<EvaluationScorecard>(r)),
   proposeFullText: (id: string, paper_id: string) =>
     fetch(`/api/runs/${id}/literature/full-text`, {
       method: "POST", headers: { "Content-Type": "application/json" },

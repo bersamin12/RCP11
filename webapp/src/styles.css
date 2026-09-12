@@ -643,25 +643,7 @@ a { color: var(--accent); }
 .annotation-kinds label small { color: var(--text-faint); font-size: 10px; }
 .annotation-composer textarea { resize: vertical; }
 
-/* ---------- evaluation rubric ---------- */
-.evaluation-rubric { display: grid; gap: 11px; margin-bottom: 14px; justify-items: start; }
-.evaluation-rubric > label, .evaluation-rubric > fieldset, .evaluation-rubric .rubric-meta { width: 100%; }
-.rubric-grid { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
-.rubric-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; font-size: 11.5px; color: var(--text-muted); }
-.rubric-scale { display: inline-flex; gap: 4px; }
-.rubric-scale label { position: relative; display: inline-grid; place-items: center; min-width: 30px; padding: 4px 0; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; }
-.rubric-scale label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 800; }
-.rubric-scale label:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
-.rubric-scale input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-.rubric-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 9px; }
-.rubric-summary { width: 100%; margin-top: 6px; }
-.rubric-summary h3 { margin: 0 0 7px; font-size: 12px; }
-.rubric-summary .mono { display: block; margin-top: 7px; color: var(--text-faint); font-size: 10.5px; }
-.field-help { margin: 0; color: var(--text-faint); font-size: 10.5px; line-height: 1.5; }
-
 @media (max-width: 760px) {
-  .rubric-row { grid-template-columns: 1fr; }
-  .rubric-scale { flex-wrap: wrap; }
   .triage-row { grid-template-columns: 1fr; }
   .triage-controls { align-items: stretch; }
   .reader-layout { grid-template-columns: 1fr; }

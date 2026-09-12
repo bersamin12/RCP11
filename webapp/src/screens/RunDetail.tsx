@@ -10,7 +10,6 @@ import { LiteratureTriage } from "../components/LiteratureTriage";
 import { PdfReaderPane } from "../components/PdfReaderPane";
 import { ReportWorkspace } from "../components/ReportWorkspace";
 import { HypothesisRanking, ResearchIntelligence } from "../components/ResearchIntelligence";
-import { EvaluationRubric } from "../components/EvaluationRubric";
 import { LineageBreadcrumb, ResearchReviewPanel } from "../components/ResearchReview";
 import { RunOutcome } from "../components/RunOutcome";
 import { ScientificChart } from "../components/ScientificChart";
@@ -201,7 +200,6 @@ export function RunDetail({ runId, goDashboard, openRun }: { runId: string; goDa
     </section>}
 
     <ResearchReviewPanel record={record} protocol={state.experiment_plan?.analysis_protocol} refresh={refresh} openRun={openRun} />
-    {record.status === "done" && <EvaluationRubric runId={runId} />}
 
     <nav className="run-tabs" aria-label="Run workspace">{TABS.map((item) => <button key={item.key} aria-current={tab === item.key ? "page" : undefined} onClick={() => updateParams({ tab: item.key })}>{item.label}{item.key in tabCounts && <span>{tabCounts[item.key as keyof typeof tabCounts]}</span>}</button>)}</nav>
 

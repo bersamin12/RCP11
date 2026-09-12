@@ -177,7 +177,7 @@ def plan_from_spec(spec: ExperimentSpec, run_id: str) -> ExperimentPlan:
     case = ExperimentCase(
         id=spec.id, label=spec.description or spec.model_name, role="candidate",
         model_name=spec.model_name, parameters=spec.parameters, outputs=spec.outputs,
-        stop_time=spec.stop_time, intervals=spec.intervals,
+        start_time=spec.start_time, stop_time=spec.stop_time, intervals=spec.intervals,
     )
     return ExperimentPlan(
         id=f"plan-{run_id}", hypothesis_id=spec.hypothesis_id, cases=[case],
@@ -230,7 +230,8 @@ def validate_plan(plan: ExperimentPlan, max_cases: int = 18) -> list[str]:
 def case_to_spec(case: ExperimentCase, hypothesis_id: str) -> ExperimentSpec:
     return ExperimentSpec(
         id=case.id, hypothesis_id=hypothesis_id, model_name=case.model_name,
-        parameters=case.parameters, outputs=case.outputs, stop_time=case.stop_time,
+        parameters=case.parameters, outputs=case.outputs,
+        start_time=case.start_time, stop_time=case.stop_time,
         intervals=case.intervals, description=case.label,
     )
 
@@ -588,7 +589,7 @@ def run_plan(
     for case in plan.cases:
         spec = case_to_spec(case, plan.hypothesis_id)
         spec_sha256 = experiment_spec_hash(spec)
-        template_key = (case.model_name, case.stop_time, case.intervals)
+        template_key = (case.model_name, case.start_time, case.stop_time, case.intervals)
         previous = existing.get(case.id)
         legacy_spec_match = bool(
             previous and not previous.execution_spec_sha256

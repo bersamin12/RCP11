@@ -330,7 +330,9 @@ def spec_compile(state: RCPState) -> dict:
             "description": m.description,
             "parameters": {p: s.model_dump() for p, s in m.parameters.items()},
             "outputs": m.outputs,
+            "default_start_time": m.default_start_time,
             "default_stop_time": m.default_stop_time,
+            "default_intervals": m.default_intervals,
         }
         for name, m in registry.items()
     }
@@ -357,6 +359,15 @@ def spec_compile(state: RCPState) -> dict:
             spec.outputs = [o for o in spec.outputs if o in model.outputs] or model.outputs
             if spec.stop_time <= 0:
                 spec.stop_time = model.default_stop_time
+    # A library wrapper is only valid over the window its upstream example and
+    # weather file were built for -- the DX airside economizer runs a mid-May
+    # slice of Chicago TMY3 -- and its upstream agreement depends on the output
+    # grid. Those are model properties, so the registry owns them, not the LLM.
+    wrapper = registry.get(spec.model_name)
+    if wrapper is not None and wrapper.source == "library-wrapper":
+        spec.start_time = wrapper.default_start_time
+        spec.stop_time = wrapper.default_stop_time
+        spec.intervals = wrapper.default_intervals
     if spec.model_name in {"ChillerCooledIntegrated", "ChillerCooledNonIntegrated"}:
         plan = benchmark_plan(hyp.id, state.run_id)
     else:

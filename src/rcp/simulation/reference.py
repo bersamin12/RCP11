@@ -21,6 +21,10 @@ REFERENCE_FILES = {
         "Buildings_Applications_DataCenters_ChillerCooled_Examples_"
         "NonIntegratedPrimarySecondaryEconomizer.txt"
     ),
+    "DXCooledAirsideEconomizer": (
+        "Buildings_Applications_DataCenters_DXCooled_Examples_"
+        "DXCooledAirsideEconomizer.txt"
+    ),
 }
 REFERENCE_ROOT = "/opt/modelica/Buildings/Resources/ReferenceResults/Dymola"
 
@@ -87,12 +91,20 @@ def compare_upstream_reference(
     }
     time = series.get("time", [])
     upstream = reference or load_reference(model_name)
-    stop_time = upstream.get("time", [time[0], time[-1]])[-1]
+    # Reference windows do not all start at zero -- the DX airside-economizer
+    # example runs from 1.188e7 s. Sampling from 0 would compare against the
+    # wrong part of the trajectory, so the grid spans the reference's own window.
+    reference_time = upstream.get("time") or [time[0], time[-1]]
+    start_time, stop_time = reference_time[0], reference_time[-1]
     variables: dict[str, dict] = {}
     for name, expected in upstream.items():
         if name == "time" or len(expected) < 3 or name not in series:
             continue
-        query = [index * stop_time / (len(expected) - 1) for index in range(len(expected))]
+        span = stop_time - start_time
+        query = [
+            start_time + index * span / (len(expected) - 1)
+            for index in range(len(expected))
+        ]
         observed = [_interpolate(time, series[name], timestamp) for timestamp in query]
         rmse = math.sqrt(sum((a - b) ** 2 for a, b in zip(observed, expected)) / len(expected))
         scale = max(max(expected) - min(expected), max(abs(value) for value in expected), 1.0)

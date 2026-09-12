@@ -8,6 +8,11 @@ from pydantic import BaseModel, Field
 
 from rcp.objects import ExperimentSpec
 
+# Profiles that share the Buildings PostProcess data-center signal group
+# (T_room_K, P_HVAC_W, E_HVAC_J, mode timers, ...), so they share one metric
+# calculation and one set of runtime plausibility checks.
+DATACENTER_BENCHMARK_PROFILES = frozenset({"chiller_benchmark", "dx_benchmark"})
+
 MODELS_DIR = Path(__file__).parent.parent / "models_library"
 REPO_ROOT = MODELS_DIR.parent.parent.parent  # models_library -> rcp -> src -> repo root
 VENDOR_DIR = REPO_ROOT / "vendor"
@@ -26,7 +31,9 @@ class ModelInfo(BaseModel):
     file: str
     class_name: str
     description: str = ""
+    default_start_time: float = 0.0
     default_stop_time: float = 86400
+    default_intervals: int = 500
     outputs: list[str] = Field(default_factory=list)
     parameters: dict[str, ParamSpec] = Field(default_factory=dict)
     validation_status: str = "unvalidated"
@@ -91,4 +98,10 @@ def validate_spec(spec: ExperimentSpec) -> list[str]:
             violations.append(f"unknown output '{out}' — available: {model.outputs}")
     if spec.stop_time <= 0:
         violations.append(f"stop_time must be positive, got {spec.stop_time}")
+    if spec.start_time < 0:
+        violations.append(f"start_time must not be negative, got {spec.start_time}")
+    if spec.start_time >= spec.stop_time:
+        violations.append(
+            f"start_time {spec.start_time} must be before stop_time {spec.stop_time}"
+        )
     return violations

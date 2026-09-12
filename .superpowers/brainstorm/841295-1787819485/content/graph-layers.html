@@ -1,0 +1,71 @@
+<h2>How the papers get organised</h2>
+<p class="subtitle">Three layers. The bottom one is free and true. The top one is cheap and rough. Only the middle one costs real money.</p>
+
+<div class="mockup">
+  <div class="mockup-body" style="padding:22px">
+
+    <div style="border:1.5px solid var(--border);border-radius:9px;padding:15px 17px;margin-bottom:12px;background:var(--bg-secondary)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:7px">
+        <strong style="font-size:15px">Layer 3 &nbsp;&mdash;&nbsp; Summaries</strong>
+        <span style="font-size:12px;color:var(--text-secondary)">this is the RAPTOR part &nbsp;·&nbsp; solves context length</span>
+      </div>
+      <div style="font-size:13.5px;line-height:1.7;color:var(--text-secondary)">
+        Group similar papers, write a summary of each group, then summarise the groups. A short tree.<br>
+        When the AI asks a wide question it reads a few group summaries instead of 300 papers. When it asks a narrow one it drops down to single papers.
+      </div>
+    </div>
+
+    <div style="text-align:center;color:var(--text-tertiary);margin:4px 0">&uarr; built from &uarr;</div>
+
+    <div style="border:2px solid var(--accent);border-radius:9px;padding:15px 17px;margin-bottom:12px;background:var(--selected-bg)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:7px">
+        <strong style="font-size:15px">Layer 2 &nbsp;&mdash;&nbsp; What each paper claims</strong>
+        <span style="font-size:12px;color:var(--warning)">AI-written &nbsp;·&nbsp; must be traceable</span>
+      </div>
+      <div style="font-size:13.5px;line-height:1.7">
+        For each paper, small fixed facts: <em>this change</em> &rarr; <em>had this effect</em> &rarr; <em>under these conditions</em>. Plus the numbers used: setpoints, loads, ranges, units.<br>
+        <span style="color:var(--text-secondary)">Every single one carries the paper it came from and the sentence it came from. If it cannot be traced, it is thrown away.</span>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text-secondary)">
+        You already have most of this. <code>PaperCard</code> stores problem, method, metrics, limitations. <code>ResearchFinding</code> already stores change &rarr; effect &rarr; direction &rarr; conditions, with the page number. That is a graph already, just stored as lists.
+      </div>
+    </div>
+
+    <div style="text-align:center;color:var(--text-tertiary);margin:4px 0">&uarr; sits on &uarr;</div>
+
+    <div style="border:1.5px solid var(--success);border-radius:9px;padding:15px 17px;background:var(--bg-secondary)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:7px">
+        <strong style="font-size:15px">Layer 1 &nbsp;&mdash;&nbsp; Who cites whom</strong>
+        <span style="font-size:12px;color:var(--success)">free &nbsp;·&nbsp; exact &nbsp;·&nbsp; no AI involved</span>
+      </div>
+      <div style="font-size:13.5px;line-height:1.7;color:var(--text-secondary)">
+        Papers, their references, who cites them, authors, venues, years. Straight from OpenAlex. These are facts, not guesses, and they cost nothing.<br>
+        This is the web you walk to find papers keyword search misses.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="split" style="margin-top:20px">
+  <div class="mockup">
+    <div class="mockup-header">Starting from a survey paper &mdash; two wins</div>
+    <div class="mockup-body" style="padding:18px;font-size:13.5px;line-height:1.75">
+      <p style="margin:0 0 12px"><strong>1. Its reference list is a hand-picked reading list</strong> made by an expert. Far better than a keyword search as a starting point.</p>
+      <p style="margin:0 0 12px"><strong>2. Surveys have a &ldquo;future work&rdquo; section.</strong> That is experts writing down the gaps, by hand. Hide it, run your gap finder, then compare. Free marking scheme.</p>
+      <p style="margin:0;color:var(--warning)"><strong>Watch out:</strong> a survey only knows the past. You must still follow forward citations to catch everything published since.</p>
+    </div>
+  </div>
+  <div class="mockup">
+    <div class="mockup-header">Why this pays off later</div>
+    <div class="mockup-body" style="padding:18px;font-size:13.5px;line-height:1.75">
+      <p style="margin:0 0 12px">You said this graph gets reused when building Modelica models and choosing what to test. That only works if we store the <strong>numbers</strong> now, not just the claims.</p>
+      <p style="margin:0 0 12px">So when reading each paper, also pull out things like <em>&ldquo;chilled water setpoint 6&ndash;10&nbsp;&deg;C&rdquo;</em>, <em>&ldquo;IT load 400&ndash;600&nbsp;kW&rdquo;</em>, with units and source.</p>
+      <p style="margin:0;color:var(--text-secondary)">Then stage 3 can ask: <em>what ranges does the literature actually use for this?</em> &mdash; and get a real answer instead of a guess.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:18px;padding:15px 17px;border-left:3px solid var(--warning);background:var(--bg-secondary);border-radius:0 8px 8px 0;font-size:13.5px;line-height:1.8">
+  <strong>One warning about off-the-shelf GraphRAG.</strong> It asks an AI to invent the entities and links itself. That gives you a graph full of edges nobody can check, and your whole project is built on being able to check things. Use the <em>idea</em> from GraphRAG &mdash; group the graph and summarise each group &mdash; but keep your own fixed fields for what gets extracted, so every link points back at a real sentence in a real paper.
+</div>
